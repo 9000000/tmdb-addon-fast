@@ -7,6 +7,12 @@ const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const DEFAULT_LANGUAGE = "en-US";
 
+// Type labels mapping for display purposes (does not affect API type values)
+const TYPE_LABELS = {
+  movie: "Detaylı Filtre (Film) 🔎",
+  series: "Detaylı Filtre (Dizi) 🔎"
+};
+
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
   const min = max - maxYears;
@@ -63,7 +69,7 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
   return {
     id,
     type,
-    name: `${tmdbPrefix ? "TMDB - " : ""}${translatedCatalogs[catalogDef.nameKey]}`,
+    name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS[type]}`,
     pageSize: 20,
     extra
   };
@@ -106,7 +112,7 @@ async function createMDBListCatalog(userCatalog, mdblistKey) {
   return {
     id: userCatalog.id,
     type: userCatalog.type,
-    name: userCatalog.name,
+    name: TYPE_LABELS[userCatalog.type],
     pageSize: 20,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
@@ -174,14 +180,14 @@ async function getManifest(config) {
     const searchCatalogMovie = {
       id: "tmdb.search",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${translatedCatalogs.search}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.movie}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const searchCatalogSeries = {
       id: "tmdb.search",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${translatedCatalogs.search}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.series}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
@@ -192,14 +198,14 @@ async function getManifest(config) {
     const aiSearchCatalogMovie = {
       id: "tmdb.aisearch",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI Search`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.movie}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const aiSearchCatalogSeries = {
       id: "tmdb.aisearch",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI Search`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.series}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 

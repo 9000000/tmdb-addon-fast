@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { type Catalog } from "@/data/catalogs";
 import { streamingServices } from "@/data/streamings";
 import { integrations } from "@/data/integrations";
+import { TYPE_LABELS } from "@/utils/typeLabels";
 
 interface SortableCatalogCardProps {
   catalog: Catalog;
@@ -77,7 +78,7 @@ export function SortableCatalogCard({ catalog, config, onChange, id }: SortableC
               <h1 className="font-semibold flex items-center gap-2">
                 {catalog.name}
                 <Badge variant="outline">
-                  {catalog.type === "movie" ? "Movie" : "Series"}
+                  {TYPE_LABELS[catalog.type]}
                 </Badge>
               </h1>
             </div>

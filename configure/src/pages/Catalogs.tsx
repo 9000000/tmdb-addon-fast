@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useConfig } from "@/contexts/ConfigContext";
 import { baseCatalogs, authCatalogs, streamingCatalogs } from "@/data/catalogs";
+import { TYPE_LABELS } from "@/utils/typeLabels";
 import { 
   DndContext, 
   DragEndEvent, 
@@ -136,7 +137,7 @@ const Catalogs = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CatalogColumn
-          title="Movies"
+          title={TYPE_LABELS.movie}
           catalogs={catalogs.filter((c) => c.type === "movie")}
           catalogConfigs={catalogConfigs}
           onCatalogChange={handleCatalogChange}
@@ -144,7 +145,7 @@ const Catalogs = () => {
           sensors={sensors}
         />
         <CatalogColumn
-          title="TV Shows"
+          title={TYPE_LABELS.series}
           catalogs={catalogs.filter((c) => c.type === "series")}
           catalogConfigs={catalogConfigs}
           onCatalogChange={handleCatalogChange}
