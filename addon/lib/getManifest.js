@@ -5,7 +5,7 @@ const { getGenresFromMDBList } = require("../utils/mdbList");
 const packageJson = require("../../package.json");
 const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
-const DEFAULT_LANGUAGE = "en-US";
+const DEFAULT_LANGUAGE = "tr-TR";
 
 // Type labels mapping for display purposes (does not affect API type values)
 const TYPE_LABELS = {
@@ -70,7 +70,7 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
     id,
     type,
     name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS[type]}`,
-    pageSize: 20,
+    pageSize: 500,
     extra
   };
 }
@@ -113,7 +113,7 @@ async function createMDBListCatalog(userCatalog, mdblistKey) {
     id: userCatalog.id,
     type: userCatalog.type,
     name: TYPE_LABELS[userCatalog.type],
-    pageSize: 20,
+    pageSize: 500,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
       { name: "skip" },
