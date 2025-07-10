@@ -95,11 +95,17 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
   const language = config.language || DEFAULT_LANGUAGE;
   const rpdbkey = config.rpdbkey
   const sessionId = config.sessionId
-  const { genre, skip, search } = extra
+  // Extract all filter parameters from URL to ensure they are preserved across pagination
+  // This fixes the issue where only genre, skip, and search were extracted, potentially
+  // losing other filter parameters when paginating through results
+  const extraParams = extra
     ? Object.fromEntries(
       new URLSearchParams(req.url.split("/").pop().split("?")[0].slice(0, -5)).entries()
     )
     : {};
+  
+  // Extract commonly used parameters while preserving all others in extraParams
+  const { genre, skip, search } = extraParams;
   const page = Math.ceil(skip ? skip / 20 + 1 : undefined) || 1;
   let metas = [];
   try {

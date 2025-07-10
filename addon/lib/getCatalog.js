@@ -20,6 +20,7 @@ async function getCatalog(type, language, page, id, genre, config) {
   }
 
   const genreList = await getGenreList(language, type);
+  // Build filter parameters for TMDB API - filtering happens server-side before pagination
   const parameters = await buildParameters(type, language, page, id, genre, genreList, config);
 
   const fetchFunction = type === "movie" ? moviedb.discoverMovie.bind(moviedb) : moviedb.discoverTv.bind(moviedb);
@@ -44,7 +45,9 @@ async function getCatalog(type, language, page, id, genre, config) {
 
 async function buildParameters(type, language, page, id, genre, genreList, config) {
   const languages = await getLanguages();
-  const parameters = { language, page, 'vote_count.gte': 10 };;
+  // Server-side filtering: All filter parameters are applied before pagination
+  // This ensures that TMDB API receives filtered results and then paginates them
+  const parameters = { language, page, 'vote_count.gte': 10 };
 
   if (config.ageRating) {
     switch (config.ageRating) {
