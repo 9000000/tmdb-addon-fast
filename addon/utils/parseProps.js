@@ -102,7 +102,7 @@ function parseGenreLink(genres, type, language) {
 }
 
 function parseCreditsLink(credits) {
-  const castData = parseCast(credits);
+  const castData = parseCast(credits, 10);
   const Cast = castData.map((actor) => {
     return {
       name: actor.name,
@@ -169,13 +169,11 @@ function parseCreatedBy(created_by) {
 function parseConfig(catalogChoices) {
   let config = {};
   
-  // Se catalogChoices for null, undefined ou vazio, retorna objeto vazio
   if (!catalogChoices) {
     return config;
   }
   
   try {
-    // Tenta descomprimir com lz-string
     const decoded = decompressFromEncodedURIComponent(catalogChoices);
     config = JSON.parse(decoded);
   } catch (e) {
@@ -218,7 +216,9 @@ function parseMedia(el, type, genreList = []) {
     description: el.overview,
   };
 }
+
 function getRpdbPoster(type, id, language, rpdbkey) {
+  if (!rpdbkey) return null;
   const tier = rpdbkey.split("-")[0];
   const lang = language.split("-")[0];
   if (tier === "t0" || tier === "t1" || lang === "en") {
