@@ -1,3 +1,5 @@
+// addon/utils/mdbList.js
+
 const axios = require("axios");
 const { getMeta } = require("../lib/getMeta");
 const { getGenreList } = require("../lib/getGenreList");
@@ -75,16 +77,16 @@ async function parseMDBListItems(items, type, genreFilter, language, rpdbkey) {
       type: type
     }));
 
-  const metaPromises = filteredItemsByType.map(item => 
+  const metaPromises = filteredItemsByType.map(item =>
     getMeta(item.type, language, item.id, rpdbkey)
       .then(result => result.meta)
       .catch(err => {
-        console.error(`Erro ao buscar metadados para ${item.id}:`, err.message);
+        console.error(`Erro ao buscar metadados para ${item.id} from MDBList:`, err.message);
         return null;
       })
   );
 
-  const metas = (await Promise.all(metaPromises)).filter(Boolean);
+  const metas = (await Promise.all(metaPromises)).filter(Boolean); // Filter out null results
 
   return { metas, availableGenres };
 }
