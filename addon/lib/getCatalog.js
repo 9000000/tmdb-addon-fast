@@ -9,45 +9,81 @@ const { getMeta } = require("./getMeta");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 
 async function getCatalog(type, language, page, id, genre, config) {
-  const mdblistKey = config.mdblistkey
+  const mdblistKey = config.mdblistkey;
 
   if (id.startsWith("mdblist.")) {
     const listId = id.split(".")[1];
-    const results = await fetchMDBListItems(listId, mdblistKey, language, page);
-    const parseResults = await parseMDBListItems(results, type, genre, language, config.rpdbkey);
+    let filteredMetas = [];
+    let currentPage = 1;
+    const pageSize = 100;
+    const needed = page * pageSize;
 
-    return parseResults
+    while (filteredMetas.length < needed) {
+      const items = await fetchMDBListItems(
+        listId,
+        mdblistKey,
+        language,
+        currentPage
+      );
+      if (items.length === 0) {
+        break; // No more items to fetch from the source
+      }
+
+      const parsed = await parseMDBListItems(
+        items,
+        type,
+        genre,
+        language,
+        config.rpdbkey
+      );
+      filteredMetas.push(...parsed.metas);
+      currentPage++;
+    }
+
+    const startIndex = (page - 1) * pageSize;
+    const metas = filteredMetas.slice(startIndex, startIndex + pageSize);
+
+    return { metas };
   }
 
   const genreList = await getGenreList(language, type);
   // Build filter parameters for TMDB API - filtering happens server-side before pagination
-  const parameters = await buildParameters(type, language, page, id, genre, genreList, config);
+  const parameters = await buildParameters(
+    type,
+    language,
+    page,
+    id,
+    genre,
+    genreList,
+    config
+  );
 
-  const fetchFunction = type === "movie" ? moviedb.discoverMovie.bind(moviedb) : moviedb.discoverTv.bind(moviedb);
+  const fetchFunction =
+    type === "movie"
+      ? moviedb.discoverMovie.bind(moviedb)
+      : moviedb.discoverTv.bind(moviedb);
 
   return fetchFunction(parameters)
     .then(async (res) => {
-      const metaPromises = res.results.map(item => 
-        getMeta(type, language, item.id, config.rpdbkey)
-          .then(result => result.meta)
-          .catch(err => {
-            console.error(`Erro ao buscar metadados para ${item.id}:`, err.message);
-            return null;
-          })
-      );
-
-      const metas = (await Promise.all(metaPromises)).filter(Boolean);
-
+      const metas = res.results.map(item => parseMedia(item, type, genreList));
       return { metas };
     })
     .catch(console.error);
 }
 
-async function buildParameters(type, language, page, id, genre, genreList, config) {
+async function buildParameters(
+  type,
+  language,
+  page,
+  id,
+  genre,
+  genreList,
+  config
+) {
   const languages = await getLanguages();
   // Server-side filtering: All filter parameters are applied before pagination
   // This ensures that TMDB API receives filtered results and then paginates them
-  const parameters = { language, page, 'vote_count.gte': 10 };
+  const parameters = { language, page, "vote_count.gte": 10 };
 
   if (config.ageRating) {
     switch (config.ageRating) {
@@ -57,15 +93,22 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
         break;
       case "PG":
         parameters.certification_country = "US";
-        parameters.certification = type === "movie" ? ["G", "PG"].join("|") : ["TV-G", "TV-PG"].join("|");
+        parameters.certification =
+          type === "movie" ? ["G", "PG"].join("|") : ["TV-G", "TV-PG"].join("|");
         break;
       case "PG-13":
         parameters.certification_country = "US";
-        parameters.certification = type === "movie" ? ["G", "PG", "PG-13"].join("|") : ["TV-G", "TV-PG", "TV-14"].join("|");
+        parameters.certification =
+          type === "movie"
+            ? ["G", "PG", "PG-13"].join("|")
+            : ["TV-G", "TV-PG", "TV-14"].join("|");
         break;
       case "R":
         parameters.certification_country = "US";
-        parameters.certification = type === "movie" ? ["G", "PG", "PG-13", "R"].join("|") : ["TV-G", "TV-PG", "TV-14", "TV-MA"].join("|");
+        parameters.certification =
+          type === "movie"
+            ? ["G", "PG", "PG-13", "R"].join("|")
+            : ["TV-G", "TV-PG", "TV-14", "TV-MA"].join("|");
         break;
       case "NC-17":
         break;
@@ -76,9 +119,9 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
     const provider = findProvider(id.split(".")[1]);
 
     parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined;
-    parameters.with_watch_providers = provider.watchProviderId
+    parameters.with_watch_providers = provider.watchProviderId;
     parameters.watch_region = provider.country;
-    parameters.with_watch_monetization_types = "flatrate|free|ads";
+    parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
   } else {
     switch (id) {
       case "tmdb.top":
@@ -90,10 +133,14 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
         break;
       case "tmdb.year":
         const year = genre ? genre : new Date().getFullYear();
-        parameters[type === "movie" ? "primary_release_year" : "first_air_date_year"] = year;
+        parameters[
+          type === "movie" ? "primary_release_year" : "first_air_date_year"
+        ] = year;
         break;
       case "tmdb.language":
-        const findGenre = genre ? findLanguageCode(genre, languages) : language.split("-")[0];
+        const findGenre = genre
+          ? findLanguageCode(genre, languages)
+          : language.split("-")[0];
         parameters.with_original_language = findGenre;
         break;
       default:
@@ -104,7 +151,7 @@ async function buildParameters(type, language, page, id, genre, genreList, confi
 }
 
 function findGenreId(genreName, genreList) {
-  const genreData = genreList.find(genre => genre.name === genreName);
+  const genreData = genreList.find((genre) => genre.name === genreName);
   return genreData ? genreData.id : undefined;
 }
 
