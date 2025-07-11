@@ -106,7 +106,7 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
   
   // Extract commonly used parameters while preserving all others in extraParams
   const { genre, skip, search } = extraParams;
-  const page = Math.ceil(skip ? skip / 20 + 1 : undefined) || 1;
+  const page = Math.ceil(skip ? skip / 100 + 1 : undefined) || 1;
   let metas = [];
   try {
     const args = [type, language, page];
