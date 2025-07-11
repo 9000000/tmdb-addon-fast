@@ -2,9 +2,9 @@ const axios = require("axios");
 const { getMeta } = require("../lib/getMeta");
 
 async function fetchMDBListItems(listId, apiKey, language, page) {
-    const offset = (page * 20) - 20;
+    const offset = (page * 100) - 100;
   try {
-    const url = `https://api.mdblist.com/lists/${listId}/items?language=${language}&limit=20&offset=${offset}&apikey=${apiKey}&append_to_response=genre,poster`;
+    const url = `https://api.mdblist.com/lists/${listId}/items?language=${language}&limit=100&offset=${offset}&apikey=${apiKey}&append_to_response=genre,poster`;
     const response = await axios.get(url);
     return [
       ...(response.data.movies || []),
