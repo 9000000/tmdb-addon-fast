@@ -200,65 +200,25 @@ async function parsePoster(type, id, poster, language, rpdbkey) {
 }
 
 function parseMedia(el, type, genreList = []) {
+  const mediaType = el.title ? 'movie' : 'series';
   const genres = Array.isArray(el.genre_ids) 
     ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
     : [];
 
   return {
     id: `tmdb:${el.id}`,
-    name: type === 'movie' ? el.title : el.name,
+    name: mediaType === 'movie' ? el.title : el.name,
     genre: genres,
     poster: `https://image.tmdb.org/t/p/w500${el.poster_path}`,
     background: `https://image.tmdb.org/t/p/original${el.backdrop_path}`,
     posterShape: "regular",
     imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
-    year: type === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
-    type: type === 'movie' ? type : 'series',
+    year: mediaType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+    type: mediaType,
     description: el.overview,
   };
 }
 function getRpdbPoster(type, id, language, rpdbkey) {
   const tier = rpdbkey.split("-")[0]
   const lang = language.split("-")[0]
-  if (tier === "t0" || tier === "t1" || lang === "en") {
-    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true`
-  } else {
-    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true&lang=${lang}`
-  }
-}
-
-async function checkIfExists(rpdbImage) {
-  return new Promise((resolve) => {
-    urlExists(rpdbImage, (err, exists) => {
-      if (exists) {
-        resolve(true)
-      } else {
-        resolve(false);
-      }
-    })
-  });
-}
-
-module.exports = {
-  parseCertification,
-  parseCast,
-  parseDirector,
-  parseSlug,
-  parseWriter,
-  parseTrailers,
-  parseTrailerStream,
-  parseImdbLink,
-  parseShareLink,
-  parseGenreLink,
-  parseCreditsLink,
-  parseCoutry,
-  parseGenres,
-  parseYear,
-  parseRunTime,
-  parseCreatedBy,
-  parseConfig,
-  parsePoster,
-  parseMedia,
-  getRpdbPoster,
-  checkIfExists
-};
+  if (tier === "t0" || tier === "t1
