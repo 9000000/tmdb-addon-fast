@@ -221,4 +221,45 @@ function parseMedia(el, type, genreList = []) {
 function getRpdbPoster(type, id, language, rpdbkey) {
   const tier = rpdbkey.split("-")[0]
   const lang = language.split("-")[0]
-  if (tier === "t0" || tier === "t1
+  if (tier === "t0" || tier === "t1" || lang === "en") {
+    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true`
+  } else {
+    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true&lang=${lang}`
+  }
+}
+
+async function checkIfExists(rpdbImage) {
+  return new Promise((resolve) => {
+    urlExists(rpdbImage, (err, exists) => {
+      if (exists) {
+        resolve(true)
+      } else {
+        resolve(false);
+      }
+    })
+  });
+}
+
+module.exports = {
+  parseCertification,
+  parseCast,
+  parseDirector,
+  parseSlug,
+  parseWriter,
+  parseTrailers,
+  parseTrailerStream,
+  parseImdbLink,
+  parseShareLink,
+  parseGenreLink,
+  parseCreditsLink,
+  parseCoutry,
+  parseGenres,
+  parseYear,
+  parseRunTime,
+  parseCreatedBy,
+  parseConfig,
+  parsePoster,
+  parseMedia,
+  getRpdbPoster,
+  checkIfExists
+};
