@@ -1,182 +1,92 @@
-require("dotenv").config();
-const { MovieDb } = require("moviedb-promise");
-const moviedb = new MovieDb(process.env.TMDB_API);
-const { getGenreList } = require("./getGenreList");
-const { getLanguages } = require("./getLanguages");
-const { parseMedia } = require("../utils/parseProps");
-const { fetchMDBListItems, parseMDBListItems } = require("../utils/mdbList");
-const { getMeta } = require("./getMeta");
-const CATALOG_TYPES = require("../static/catalog-types.json");
+const axios = require("axios");
+const { getMeta } = require("../lib/getMeta");
+const { getGenreList } = require("../lib/getGenreList");
 
-async function getCatalog(type, language, page, id, genre, config) {
-  const mdblistKey = config.mdblistkey;
+async function fetchMDBListItems(listId, apiKey, language, page) {
+    const offset = (page * 100) - 100;
+  try {
+    const url = `https://api.mdblist.com/lists/${listId}/items?language=${language}&limit=100&offset=${offset}&apikey=${apiKey}&append_to_response=genre,poster`;
+    const response = await axios.get(url);
+    return [
+      ...(response.data.movies || []),
+      ...(response.data.shows || [])
+    ];
+  } catch (err) {
+    console.error("Error retrieving MDBList items:", err.message, err);
+    return [];
+  }
+}
 
-  if (id.startsWith("mdblist.")) {
-    const listId = id.split(".")[1];
-    let filteredMetas = [];
-    let currentPage = 1;
-    const pageSize = 100;
-    const needed = page * pageSize;
+async function getGenresFromMDBList(listId, apiKey) {
+  try {
+    const items = await fetchMDBListItems(listId, apiKey);
+    const genres = [
+      ...new Set(
+        items.flatMap(item =>
+          (item.genre || []).map(g => {
+            if (!g || typeof g !== "string") return null;
+            return g.charAt(0).toUpperCase() + g.slice(1).toLowerCase();
+          })
+        ).filter(Boolean)
+      )
+    ].sort();
+    return genres;
+  } catch(err) {
+    console.error("ERROR in getGenresFromMDBList:", err);
+    return [];
+  }
+}
 
-    while (filteredMetas.length < needed) {
-      const items = await fetchMDBListItems(
-        listId,
-        mdblistKey,
-        language,
-        currentPage
-      );
-      if (items.length === 0) {
-        break; // No more items to fetch from the source
-      }
+async function parseMDBListItems(items, type, genreFilter, language, rpdbkey) {
+  const availableGenres = [
+    ...new Set(
+      items.flatMap(item =>
+        (item.genre || [])
+          .map(g =>
+            typeof g === "string"
+              ? g.charAt(0).toUpperCase() + g.slice(1).toLowerCase()
+              : null
+          )
+          .filter(Boolean)
+      )
+    )
+  ].sort();
 
-      const parsed = await parseMDBListItems(
-        items,
-        type,
-        genre,
-        language,
-        config.rpdbkey
-      );
-      filteredMetas.push(...parsed.metas);
-      currentPage++;
-    }
-
-    const startIndex = (page - 1) * pageSize;
-    const metas = filteredMetas.slice(startIndex, startIndex + pageSize);
-
-    return { metas };
+  let filteredItems = items;
+  if (genreFilter) {
+    filteredItems = filteredItems.filter(item =>
+      Array.isArray(item.genre) &&
+      item.genre.some(
+        g =>
+          typeof g === "string" &&
+          g.toLowerCase() === genreFilter.toLowerCase()
+      )
+    );
   }
 
-  const genreList = await getGenreList(language, type);
-  // Build filter parameters for TMDB API - filtering happens server-side before pagination
-  const parameters = await buildParameters(
-    type,
-    language,
-    page,
-    id,
-    genre,
-    genreList,
-    config
+  const filteredItemsByType = filteredItems
+    .filter(item => {
+      if (type === "series") return item.mediatype === "show";
+      if (type === "movie") return item.mediatype === "movie";
+      return false;
+    })
+    .map(item => ({
+      id: item.id,
+      type: type
+    }));
+
+  const metaPromises = filteredItemsByType.map(item => 
+    getMeta(item.type, language, item.id, rpdbkey)
+      .then(result => result.meta)
+      .catch(err => {
+        console.error(`Erro ao buscar metadados para ${item.id}:`, err.message);
+        return null;
+      })
   );
 
-  const fetchFunction =
-    type === "movie"
-      ? moviedb.discoverMovie.bind(moviedb)
-      : moviedb.discoverTv.bind(moviedb);
+  const metas = (await Promise.all(metaPromises)).filter(Boolean);
 
-  return fetchFunction(parameters)
-    .then(async (res) => {
-      const metaPromises = res.results.map((item) =>
-        getMeta(type, language, item.id, config.rpdbkey)
-          .then((result) => result.meta)
-          .catch((err) => {
-            console.error(
-              `Erro ao buscar metadados para ${item.id}:`,
-              err.message
-            );
-            return null;
-          })
-      );
-
-      const metas = (await Promise.all(metaPromises)).filter(Boolean);
-
-      return { metas };
-    })
-    .catch(console.error);
+  return { metas, availableGenres };
 }
 
-async function buildParameters(
-  type,
-  language,
-  page,
-  id,
-  genre,
-  genreList,
-  config
-) {
-  const languages = await getLanguages();
-  // Server-side filtering: All filter parameters are applied before pagination
-  // This ensures that TMDB API receives filtered results and then paginates them
-  const parameters = { language, page, "vote_count.gte": 10 };
-
-  if (config.ageRating) {
-    switch (config.ageRating) {
-      case "G":
-        parameters.certification_country = "US";
-        parameters.certification = type === "movie" ? "G" : "TV-G";
-        break;
-      case "PG":
-        parameters.certification_country = "US";
-        parameters.certification =
-          type === "movie" ? ["G", "PG"].join("|") : ["TV-G", "TV-PG"].join("|");
-        break;
-      case "PG-13":
-        parameters.certification_country = "US";
-        parameters.certification =
-          type === "movie"
-            ? ["G", "PG", "PG-13"].join("|")
-            : ["TV-G", "TV-PG", "TV-14"].join("|");
-        break;
-      case "R":
-        parameters.certification_country = "US";
-        parameters.certification =
-          type === "movie"
-            ? ["G", "PG", "PG-13", "R"].join("|")
-            : ["TV-G", "TV-PG", "TV-14", "TV-MA"].join("|");
-        break;
-      case "NC-17":
-        break;
-    }
-  }
-
-  if (id.includes("streaming")) {
-    const provider = findProvider(id.split(".")[1]);
-
-    parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined;
-    parameters.with_watch_providers = provider.watchProviderId;
-    parameters.watch_region = provider.country;
-    parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
-  } else {
-    switch (id) {
-      case "tmdb.top":
-        parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined;
-        if (type === "series") {
-          parameters.watch_region = language.split("-")[1];
-          parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
-        }
-        break;
-      case "tmdb.year":
-        const year = genre ? genre : new Date().getFullYear();
-        parameters[
-          type === "movie" ? "primary_release_year" : "first_air_date_year"
-        ] = year;
-        break;
-      case "tmdb.language":
-        const findGenre = genre
-          ? findLanguageCode(genre, languages)
-          : language.split("-")[0];
-        parameters.with_original_language = findGenre;
-        break;
-      default:
-        break;
-    }
-  }
-  return parameters;
-}
-
-function findGenreId(genreName, genreList) {
-  const genreData = genreList.find((genre) => genre.name === genreName);
-  return genreData ? genreData.id : undefined;
-}
-
-function findLanguageCode(genre, languages) {
-  const language = languages.find((lang) => lang.name === genre);
-  return language ? language.iso_639_1.split("-")[0] : "";
-}
-
-function findProvider(providerId) {
-  const provider = CATALOG_TYPES.streaming[providerId];
-  if (!provider) throw new Error(`Could not find provider: ${providerId}`);
-  return provider;
-}
-
-module.exports = { getCatalog };
+module.exports = { fetchMDBListItems, getGenresFromMDBList, parseMDBListItems };
