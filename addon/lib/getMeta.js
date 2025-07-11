@@ -1,3 +1,5 @@
+// addon/lib/getMeta.js
+
 require("dotenv").config();
 const { MovieDb } = require("moviedb-promise");
 const Utils = require("../utils/parseProps");
@@ -28,7 +30,7 @@ async function getCachedImdbRating(imdbId, type) {
 }
 
 // Helper functions
-const getCacheKey = (type, language, tmdbId, rpdbkey) => 
+const getCacheKey = (type, language, tmdbId, rpdbkey) =>
   `${type}-${language}-${tmdbId}-${rpdbkey}`;
 
 const processLogo = (logo) => {
@@ -45,14 +47,27 @@ const buildLinks = (imdbRating, imdbId, title, type, genres, credits, language) 
 
 // Movie specific functions
 const fetchMovieData = async (tmdbId, language) => {
-  return await moviedb.movieInfo({
-    id: tmdbId,
-    language,
-    append_to_response: "videos,credits,external_ids"
-  });
+  try {
+    console.log(`[DEBUG] Fetching movie data for TMDB ID: ${tmdbId}, Language: ${language}`); // Existing debug log
+    const res = await moviedb.movieInfo({
+      id: tmdbId,
+      language,
+      append_to_response: "videos,credits,external_ids"
+    });
+    return res;
+  } catch (error) {
+    // Check for 404 or other errors related to resource not found
+    if (error.response && error.response.status === 404) {
+      console.warn(`[WARNING] TMDB Movie ID ${tmdbId} not found (404). Returning null.`);
+      return null; // Return null if movie not found
+    }
+    console.error(`[ERROR] Error fetching movie data for TMDB ID ${tmdbId}:`, error.message);
+    throw error; // Re-throw other unexpected errors
+  }
 };
 
 const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config = {}) => {
+  // ... (rest of this function remains the same)
   const [poster, logo, imdbRatingRaw] = await Promise.all([
     Utils.parsePoster(type, tmdbId, res.poster_path, language, rpdbkey),
     getLogo(tmdbId, language, res.original_language).catch(e => {
@@ -63,7 +78,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config =
   ]);
 
   const imdbRating = imdbRatingRaw || res.vote_average?.toFixed(1) || "N/A";
-  const castCount = 10;
+  const castCount = 10; // This value comes from config, consider using config.castCount directly
   const hideInCinemaTag = config.hideInCinemaTag === true || config.hideInCinemaTag === "true";
 
   const response = {
@@ -94,7 +109,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config =
     },
     logo: processLogo(logo),
     app_extras: {
-      cast: Utils.parseCast(res.credits, castCount)
+      cast: Utils.parseCast(res.credits, config.castCount !== undefined ? config.castCount : castCount) // Use config.castCount
     }
   };
   if (hideInCinemaTag) delete response.imdb_id;
@@ -103,11 +118,23 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config =
 
 // TV show specific functions
 const fetchTvData = async (tmdbId, language) => {
-  return await moviedb.tvInfo({
-    id: tmdbId,
-    language,
-    append_to_response: "videos,credits,external_ids"
-  });
+  try {
+    console.log(`[DEBUG] Fetching TV data for TMDB ID: ${tmdbId}, Language: ${language}`); // Existing debug log
+    const res = await moviedb.tvInfo({
+      id: tmdbId,
+      language,
+      append_to_response: "videos,credits,external_ids"
+    });
+    return res;
+  } catch (error) {
+    // Check for 404 or other errors related to resource not found
+    if (error.response && error.response.status === 404) {
+      console.warn(`[WARNING] TMDB TV ID ${tmdbId} not found (404). Returning null.`);
+      return null; // Return null if TV show not found
+    }
+    console.error(`[ERROR] Error fetching TV data for TMDB ID ${tmdbId}:`, error.message);
+    throw error; // Re-throw other unexpected errors
+  }
 };
 
 const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config = {}) => {
@@ -129,7 +156,7 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config = {}
   ]);
 
   const imdbRating = imdbRatingRaw || res.vote_average?.toFixed(1) || "N/A";
-  const castCount = 10;
+  const castCount = 10; // This value comes from config, consider using config.castCount directly
   const hideInCinemaTag = config.hideInCinemaTag === true || config.hideInCinemaTag === "true";
 
   const response = {
@@ -161,7 +188,7 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config = {}
     },
     logo: processLogo(logo),
     app_extras: {
-      cast: Utils.parseCast(res.credits, castCount)
+      cast: Utils.parseCast(res.credits, config.castCount !== undefined ? config.castCount : castCount) // Use config.castCount
     }
   };
   if (hideInCinemaTag) delete response.imdb_id;
@@ -184,22 +211,33 @@ const buildTvResponse = async (res, type, language, tmdbId, rpdbkey, config = {}
 async function getMeta(type, language, tmdbId, rpdbkey, config = {}) {
   const cacheKey = getCacheKey(type, language, tmdbId, rpdbkey);
   const cachedData = cache.get(cacheKey);
-  
+
   if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
     return Promise.resolve({ meta: cachedData.data });
   }
 
   try {
-    const meta = await (type === "movie" ? 
-      fetchMovieData(tmdbId, language).then(res => buildMovieResponse(res, type, language, tmdbId, rpdbkey, config)) :
-      fetchTvData(tmdbId, language).then(res => buildTvResponse(res, type, language, tmdbId, rpdbkey, config))
+    const res = await (type === "movie" ?
+      fetchMovieData(tmdbId, language) :
+      fetchTvData(tmdbId, language)
+    );
+
+    // If fetchMovieData or fetchTvData returned null (e.g., due to 404)
+    if (res === null) {
+      return { meta: null }; // Return null meta to indicate not found
+    }
+
+    const meta = await (type === "movie" ?
+      buildMovieResponse(res, type, language, tmdbId, rpdbkey, config) :
+      buildTvResponse(res, type, language, tmdbId, rpdbkey, config)
     );
 
     cache.set(cacheKey, { data: meta, timestamp: Date.now() });
     return Promise.resolve({ meta });
   } catch (error) {
-    console.error(`Error in getMeta: ${error.message}`);
-    throw error;
+    console.error(`Error in getMeta for TMDB ID ${tmdbId}: ${error.message}`);
+    // Do not re-throw here, let the calling function handle the null meta
+    return { meta: null };
   }
 }
 
