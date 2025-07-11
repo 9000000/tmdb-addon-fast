@@ -198,14 +198,14 @@ async function parsePoster(type, id, poster, language, rpdbkey) {
 }
 
 function parseMedia(el, type, genreList = []) {
-  const mediaType = el.title ? 'movie' : 'series';
+  const mediaType = type === 'tv' ? 'series' : 'movie';
   const genres = Array.isArray(el.genre_ids) 
     ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
     : [];
 
   return {
     id: `tmdb:${el.id}`,
-    name: mediaType === 'movie' ? el.title : el.name,
+    name: el.title || el.name,
     genre: genres,
     poster: `https://image.tmdb.org/t/p/w500${el.poster_path}`,
     background: `https://image.tmdb.org/t/p/original${el.backdrop_path}`,
