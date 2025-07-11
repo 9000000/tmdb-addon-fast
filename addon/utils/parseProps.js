@@ -83,7 +83,7 @@ function parseShareLink(title, imdb_id, type) {
   return {
     name: title,
     category: "share",
-    url: `https://www.strem.io/s/${parseSlug(type, title, imdb_id)}`,
+    url: `https://web.stremio.com/#/detail/${type}/${imdb_id}`,
   };
 }
 
