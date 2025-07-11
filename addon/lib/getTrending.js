@@ -1,7 +1,8 @@
 require("dotenv").config();
 const { MovieDb } = require("moviedb-promise");
 const moviedb = new MovieDb(process.env.TMDB_API);
-const { getMeta } = require("./getMeta");
+const { parseMedia } = require("../utils/parseProps");
+const { getGenreList } = require("./getGenreList");
 
 async function getTrending(type, language, page, genre, config) {
   const media_type = type === "series" ? "tv" : type;
@@ -12,19 +13,12 @@ async function getTrending(type, language, page, genre, config) {
     page,
   };
 
+  const genreList = await getGenreList(language, type);
+
   return await moviedb
     .trending(parameters)
-    .then(async (res) => {
-      const metaPromises = res.results.map(item => 
-        getMeta(type, language, item.id, config.rpdbkey)
-          .then(result => result.meta)
-          .catch(err => {
-            console.error(`Erro ao buscar metadados para ${item.id}:`, err.message);
-            return null;
-          })
-      );
-
-      const metas = (await Promise.all(metaPromises)).filter(Boolean);
+    .then((res) => {
+      const metas = res.results.map(item => parseMedia(item, type, genreList));
       return { metas };
     })
     .catch(console.error);
