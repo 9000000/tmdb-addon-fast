@@ -79,11 +79,11 @@ function parseImdbLink(vote_average, imdb_id) {
   };
 }
 
-function parseShareLink(title, imdb_id, type) {
+function parseShareLink(title, id, type) {
   return {
     name: title,
     category: "share",
-    url: `https://web.stremio.com/#/detail/${type}/${imdb_id}`,
+    url: `https://web.stremio.com/#/detail/${type}/${id}`,
   };
 }
 
