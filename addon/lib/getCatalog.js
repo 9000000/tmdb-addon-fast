@@ -5,7 +5,6 @@ const { getGenreList } = require("./getGenreList");
 const { getLanguages } = require("./getLanguages");
 const { parseMedia } = require("../utils/parseProps");
 const { fetchMDBListItems, parseMDBListItems } = require("../utils/mdbList");
-const { getMeta } = require("./getMeta");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 
 async function getCatalog(type, language, page, id, genre, config) {
@@ -15,7 +14,7 @@ async function getCatalog(type, language, page, id, genre, config) {
     const listId = id.split(".")[1];
     let filteredMetas = [];
     let currentPage = 1;
-    const pageSize = 100;
+    const pageSize = 20;
     const needed = page * pageSize;
 
     while (filteredMetas.length < needed) {
@@ -26,7 +25,7 @@ async function getCatalog(type, language, page, id, genre, config) {
         currentPage
       );
       if (items.length === 0) {
-        break; // No more items to fetch from the source
+        break; 
       }
 
       const parsed = await parseMDBListItems(
@@ -47,7 +46,6 @@ async function getCatalog(type, language, page, id, genre, config) {
   }
 
   const genreList = await getGenreList(language, type);
-  // Build filter parameters for TMDB API - filtering happens server-side before pagination
   const parameters = await buildParameters(
     type,
     language,
@@ -64,7 +62,7 @@ async function getCatalog(type, language, page, id, genre, config) {
       : moviedb.discoverTv.bind(moviedb);
 
   return fetchFunction(parameters)
-    .then(async (res) => {
+    .then((res) => {
       const metas = res.results.map(item => parseMedia(item, type, genreList));
       return { metas };
     })
@@ -81,8 +79,6 @@ async function buildParameters(
   config
 ) {
   const languages = await getLanguages();
-  // Server-side filtering: All filter parameters are applied before pagination
-  // This ensures that TMDB API receives filtered results and then paginates them
   const parameters = { language, page, "vote_count.gte": 10 };
 
   if (config.ageRating) {
@@ -121,7 +117,7 @@ async function buildParameters(
     parameters.with_genres = genre ? findGenreId(genre, genreList) : undefined;
     parameters.with_watch_providers = provider.watchProviderId;
     parameters.watch_region = provider.country;
-    parameters.with_watch_monetization_types = "flatrate|free|ads|rent|buy";
+    parameters.with_watch_monetization_types = "flatrate|free|ads";
   } else {
     switch (id) {
       case "tmdb.top":
