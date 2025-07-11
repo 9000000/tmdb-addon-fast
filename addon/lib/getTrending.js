@@ -5,7 +5,7 @@ const { parseMedia } = require("../utils/parseProps");
 const { getGenreList } = require("./getGenreList");
 
 async function getTrending(type, language, page, genre, config) {
-  const media_type = type === "series" ? "tv" : type;
+  const media_type = type === "series" ? "tv" : "movie";
   const parameters = {
     media_type,
     time_window: genre ? genre.toLowerCase() : "day",
@@ -18,7 +18,7 @@ async function getTrending(type, language, page, genre, config) {
   return await moviedb
     .trending(parameters)
     .then((res) => {
-      const metas = res.results.map(item => parseMedia(item, type, genreList));
+      const metas = res.results.map(item => parseMedia(item, media_type, genreList));
       return { metas };
     })
     .catch(console.error);
