@@ -10,7 +10,10 @@ function isNonLatin(text) {
   return /[^\u0000-\u007F]/.test(text);
 }
 
+const { toCanonicalType } = require("../utils/typeCanonical");
+
 async function getSearch(id, type, language, query, config) {
+  type = toCanonicalType(type);
   let searchQuery = query;
   if (isNonLatin(searchQuery)) {
     searchQuery = transliterate(searchQuery);

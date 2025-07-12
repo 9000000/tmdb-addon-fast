@@ -7,7 +7,10 @@ const { parseMedia } = require("../utils/parseProps");
 const { fetchMDBListItems, parseMDBListItems } = require("../utils/mdbList");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 
+const { toCanonicalType } = require("../utils/typeCanonical");
+
 async function getCatalog(type, language, page, id, genre, config) {
+  type = toCanonicalType(type);
   const mdblistKey = config.mdblistkey;
 
   if (id.startsWith("mdblist.")) {
