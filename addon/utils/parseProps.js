@@ -1,5 +1,6 @@
 const urlExists = require("url-exists");
 const { decompressFromEncodedURIComponent } = require('lz-string');
+const { toCanonicalType } = require("./typeCanonical");
 
 function parseCertification(release_dates, language) {
   return release_dates.results.filter(
@@ -43,8 +44,11 @@ function parseWriter(credits) {
 }
 
 function parseSlug(type, title, imdb_id) {
-  return `${type}/${title.toLowerCase().replace(/ /g, "-")}-${imdb_id ? imdb_id.replace("tt", "") : ""
-    }`;
+  const canonicalType = toCanonicalType(type);
+  if (canonicalType !== "movie" && canonicalType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in parseSlug: ${canonicalType}`);
+  }
+  return `${canonicalType}/${title.toLowerCase().replace(/ /g, "-")}-${imdb_id ? imdb_id.replace("tt", "") : ""}`;
 }
 
 function parseTrailers(videos) {
@@ -80,21 +84,29 @@ function parseImdbLink(vote_average, imdb_id) {
 }
 
 function parseShareLink(title, id, type) {
+  const canonicalType = toCanonicalType(type);
+  if (canonicalType !== "movie" && canonicalType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in parseShareLink: ${canonicalType}`);
+  }
   return {
     name: title,
     category: "share",
-    url: `https://web.stremio.com/#/detail/${type}/${id}`,
+    url: `https://web.stremio.com/#/detail/${canonicalType}/${id}`,
   };
 }
 
 function parseGenreLink(genres, type, language) {
+  const canonicalType = toCanonicalType(type);
+  if (canonicalType !== "movie" && canonicalType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in parseGenreLink: ${canonicalType}`);
+  }
   return genres.map((genre) => {
     return {
       name: genre.name,
       category: "Genres",
       url: `stremio:///discover/${encodeURIComponent(
         process.env.HOST_NAME
-      )}%2F${language}%2Fmanifest.json/${type}/tmdb.top?genre=${encodeURIComponent(
+      )}%2F${language}%2Fmanifest.json/${canonicalType}/tmdb.top?genre=${encodeURIComponent(
         genre.name
       )}`,
     };
@@ -189,16 +201,26 @@ function parseConfig(catalogChoices) {
 }
 
 async function parsePoster(type, id, poster, language, rpdbkey) {
+  const canonicalType = toCanonicalType(type);
+  if (canonicalType !== "movie" && canonicalType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in parsePoster: ${canonicalType}`);
+  }
   const tmdbImage = `https://image.tmdb.org/t/p/w500${poster}`
   if (rpdbkey) {
-    const rpdbImage = getRpdbPoster(type, id, language, rpdbkey)
+    const rpdbImage = getRpdbPoster(canonicalType, id, language, rpdbkey)
     return await checkIfExists(rpdbImage) ? rpdbImage : tmdbImage;
   }
   return tmdbImage;
 }
 
 function parseMedia(el, type, genreList = []) {
-  const mediaType = type === 'tv' ? 'series' : 'movie';
+  const canonicalType = toCanonicalType(type);
+  let mediaType = canonicalType;
+  // If TMDB API returns 'tv', treat as 'series'
+  if (canonicalType === 'tv') mediaType = 'series';
+  if (mediaType !== "movie" && mediaType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in parseMedia: ${mediaType}`);
+  }
   const genres = Array.isArray(el.genre_ids) 
     ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
     : [];
@@ -218,13 +240,17 @@ function parseMedia(el, type, genreList = []) {
 }
 
 function getRpdbPoster(type, id, language, rpdbkey) {
+  const canonicalType = toCanonicalType(type);
+  if (canonicalType !== "movie" && canonicalType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in getRpdbPoster: ${canonicalType}`);
+  }
   if (!rpdbkey) return null;
   const tier = rpdbkey.split("-")[0];
   const lang = language.split("-")[0];
   if (tier === "t0" || tier === "t1" || lang === "en") {
-    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true`;
+    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${canonicalType}-${id}.jpg?fallback=true`;
   } else {
-    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${type}-${id}.jpg?fallback=true&lang=${lang}`;
+    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${canonicalType}-${id}.jpg?fallback=true&lang=${lang}`;
   }
 }
 
