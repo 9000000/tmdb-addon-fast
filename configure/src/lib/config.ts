@@ -1,4 +1,5 @@
 import { compressToEncodedURIComponent } from 'lz-string';
+import { toCanonicalType } from '@/utils/typeCanonical';
 
 interface AddonConfig {
   rpdbkey?: string;
@@ -34,7 +35,7 @@ export function generateAddonUrl(config: AddonConfig): string {
       ?.filter(catalog => catalog.enabled === false ? false : true)
       .map(({ id, type, name, showInHome }) => ({
         id,
-        type,
+        type: toCanonicalType(type),
         name,
         showInHome
       })),

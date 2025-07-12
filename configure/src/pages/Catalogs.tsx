@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useConfig } from "@/contexts/ConfigContext";
 import { baseCatalogs, authCatalogs, streamingCatalogs } from "@/data/catalogs";
 import { TYPE_LABELS } from "@/utils/typeLabels";
+import { toCanonicalType } from "@/utils/typeCanonical";
 import { 
   DndContext, 
   DragEndEvent, 
@@ -108,8 +109,8 @@ const Catalogs = () => {
   const handleCatalogChange = (catalogId, type, enabled, showInHome) => {
     setCatalogs((prev) => {
       return prev.map((c) =>
-        c.id === catalogId && c.type === type
-          ? { ...c, enabled: enabled === true, showInHome }
+        c.id === catalogId && toCanonicalType(c.type) === toCanonicalType(type)
+          ? { ...c, type: toCanonicalType(type), enabled: enabled === true, showInHome }
           : c
       );
     });
@@ -138,7 +139,7 @@ const Catalogs = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CatalogColumn
           title={TYPE_LABELS.movie}
-          catalogs={catalogs.filter((c) => c.type === "movie")}
+          catalogs={catalogs.filter((c) => toCanonicalType(c.type) === "movie")}
           catalogConfigs={catalogConfigs}
           onCatalogChange={handleCatalogChange}
           onDragEnd={handleDragEnd}
@@ -146,7 +147,7 @@ const Catalogs = () => {
         />
         <CatalogColumn
           title={TYPE_LABELS.series}
-          catalogs={catalogs.filter((c) => c.type === "series")}
+          catalogs={catalogs.filter((c) => toCanonicalType(c.type) === "series")}
           catalogConfigs={catalogConfigs}
           onCatalogChange={handleCatalogChange}
           onDragEnd={handleDragEnd}
