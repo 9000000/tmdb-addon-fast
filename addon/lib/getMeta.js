@@ -89,7 +89,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config =
   const hideInCinemaTag = config.hideInCinemaTag === true || config.hideInCinemaTag === "true";
 
   const response = {
-    imdb_id: res.imdb_id,
+    imdb_id: res.external_ids?.imdb_id,
     country: Utils.parseCoutry(res.production_countries),
     description: res.overview,
     director: Utils.parseDirector(res.credits),
@@ -97,7 +97,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config =
     imdbRating,
     name: res.title,
     released: new Date(res.release_date),
-    slug: Utils.parseSlug(canonicalType, res.title, res.imdb_id),
+    slug: Utils.parseSlug(canonicalType, res.title, res.external_ids?.imdb_id),
     type: canonicalType,
     writer: Utils.parseWriter(res.credits),
     year: res.release_date ? res.release_date.substr(0, 4) : "",
@@ -109,9 +109,9 @@ const buildMovieResponse = async (res, type, language, tmdbId, rpdbkey, config =
     genres: Utils.parseGenres(res.genres),
     releaseInfo: res.release_date ? res.release_date.substr(0, 4) : "",
     trailerStreams: Utils.parseTrailerStream(res.videos),
-    links: buildLinks(imdbRating, res.imdb_id, res.title, canonicalType, res.genres, res.credits, language),
+    links: buildLinks(imdbRating, res.external_ids?.imdb_id, res.title, canonicalType, res.genres, res.credits, language),
     behaviorHints: {
-      defaultVideoId: res.imdb_id ? res.imdb_id : `tmdb:${res.id}`,
+      defaultVideoId: res.external_ids?.imdb_id ? res.external_ids?.imdb_id : `tmdb:${res.id}`,
       hasScheduledVideos: false
     },
     logo: processLogo(logo),

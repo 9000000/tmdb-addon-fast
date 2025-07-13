@@ -214,13 +214,15 @@ async function parsePoster(type, id, poster, language, rpdbkey) {
 }
 
 function parseMedia(el, type, genreList = []) {
-  const canonicalType = toCanonicalType(type);
-  let mediaType = canonicalType;
-  // If TMDB API returns 'tv', treat as 'series'
-  if (canonicalType === 'tv') mediaType = 'series';
-  if (mediaType !== "movie" && mediaType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in parseMedia: ${mediaType}`);
+  // Handle TMDB API type inconsistency: 'tv' should be treated as 'series'
+  let normalizedType = type;
+  if (type === 'tv') normalizedType = 'series';
+  
+  const canonicalType = toCanonicalType(normalizedType);
+  if (canonicalType !== "movie" && canonicalType !== "series") {
+    console.error(`[ERROR] Unexpected canonical type in parseMedia: ${canonicalType}, original type: ${type}`);
   }
+  
   const genres = Array.isArray(el.genre_ids) 
     ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
     : [];
@@ -233,8 +235,8 @@ function parseMedia(el, type, genreList = []) {
     background: `https://image.tmdb.org/t/p/original${el.backdrop_path}`,
     posterShape: "regular",
     imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
-    year: mediaType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
-    type: mediaType,
+    year: canonicalType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+    type: canonicalType,
     description: el.overview,
   };
 }

@@ -5,7 +5,8 @@ const labelToType: Record<string, "movie" | "series"> = {
   [TYPE_LABELS.movie]: "movie",
   [TYPE_LABELS.series]: "series",
   movie: "movie",
-  series: "series"
+  series: "series",
+  tv: "series"  // Handle TMDB API inconsistency
 };
 
 /**

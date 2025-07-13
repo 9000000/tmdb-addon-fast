@@ -14,6 +14,7 @@ const { parseConfig, getRpdbPoster, checkIfExists } = require("./utils/parseProp
 const { getRequestToken, getSessionId } = require("./lib/getSession");
 const { getFavorites, getWatchList } = require("./lib/getPersonalLists");
 const { blurImage } = require('./utils/imageProcessor');
+const { toCanonicalType } = require('./utils/typeCanonical');
 
 addon.use(analytics.middleware);
 addon.use(favicon(path.join(__dirname, '../public/favicon.png')));
@@ -91,6 +92,7 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
 
 addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
   const { catalogChoices, type, id, extra } = req.params;
+  const canonicalType = toCanonicalType(type); // Canonicalize type at entry point
   const config = parseConfig(catalogChoices) || {};
   const language = config.language || DEFAULT_LANGUAGE;
   const rpdbkey = config.rpdbkey
@@ -102,10 +104,10 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
   const page = Math.ceil(skip ? skip / 100 + 1 : undefined) || 1;
   let metas = [];
   try {
-    const args = [type, language, page];
+    const args = [canonicalType, language, page]; // Use canonical type
 
     if (search) {
-      metas = await getSearch(id, type, language, search, config);
+      metas = await getSearch(id, canonicalType, language, search, config);
     } else {
       switch (id) {
         case "tmdb.trending":
@@ -135,7 +137,7 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
     try {
       metas = JSON.parse(JSON.stringify(metas));
       metas.metas = await Promise.all(metas.metas.map(async (el) => {
-        const rpdbImage = getRpdbPoster(type, el.id.replace('tmdb:', ''), language, rpdbkey) 
+        const rpdbImage = getRpdbPoster(canonicalType, el.id.replace('tmdb:', ''), language, rpdbkey) // Use canonical type 
         el.poster = await checkIfExists(rpdbImage) ? rpdbImage : el.poster;
         return el;
       }))
@@ -146,6 +148,7 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
 
 addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
   const { catalogChoices, type, id } = req.params;
+  const canonicalType = toCanonicalType(type); // Canonicalize type at entry point
   const config = parseConfig(catalogChoices) || {};
   const tmdbId = id.split(":")[1];
   const language = config.language || DEFAULT_LANGUAGE;
@@ -153,8 +156,8 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
   const imdbId = req.params.id.split(":")[0];
 
   if (req.params.id.includes("tmdb:")) {
-    const resp = await cacheWrapMeta(`${language}:${type}:${tmdbId}`, async () => {
-      return await getMeta(type, language, tmdbId, rpdbkey, {
+    const resp = await cacheWrapMeta(`${language}:${canonicalType}:${tmdbId}`, async () => {
+      return await getMeta(canonicalType, language, tmdbId, rpdbkey, {
         hideEpisodeThumbnails: config.hideEpisodeThumbnails === "true"
       });
     });
@@ -162,19 +165,19 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
       staleRevalidate: 20 * 24 * 60 * 60,
       staleError: 30 * 24 * 60 * 60,
     };
-    if (type == "movie") {
+    if (canonicalType == "movie") {
       cacheOpts.cacheMaxAge = 14 * 24 * 60 * 60;
-    } else if (type == "series") {
+    } else if (canonicalType == "series") {
       const hasEnded = !!((resp.releaseInfo || "").length > 5);
       cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
     }
     respond(res, resp, cacheOpts);
   }
   if (req.params.id.includes("tt")) {
-    const tmdbId = await getTmdb(type, imdbId);
+    const tmdbId = await getTmdb(canonicalType, imdbId);
     if (tmdbId) {
-      const resp = await cacheWrapMeta(`${language}:${type}:${tmdbId}`, async () => {
-        return await getMeta(type, language, tmdbId, rpdbkey, {
+      const resp = await cacheWrapMeta(`${language}:${canonicalType}:${tmdbId}`, async () => {
+        return await getMeta(canonicalType, language, tmdbId, rpdbkey, {
           hideEpisodeThumbnails: config.hideEpisodeThumbnails === "true"
         });
       });
@@ -182,9 +185,9 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
         staleRevalidate: 20 * 24 * 60 * 60,
         staleError: 30 * 24 * 60 * 60,
       };
-      if (type == "movie") {
+      if (canonicalType == "movie") {
         cacheOpts.cacheMaxAge = 14 * 24 * 60 * 60;
-      } else if (type == "series") {
+      } else if (canonicalType == "series") {
         const hasEnded = !!((resp.releaseInfo || "").length > 5);
         cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
       }

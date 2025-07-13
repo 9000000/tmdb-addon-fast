@@ -3,6 +3,7 @@ const { MovieDb } = require("moviedb-promise");
 const moviedb = new MovieDb(process.env.TMDB_API);
 const { getGenreList } = require("./getGenreList");
 const { parseMedia } = require("../utils/parseProps");
+const { toCanonicalType } = require("../utils/typeCanonical");
 const translations = require("../static/translations.json");
 
 function getAllTranslations(key) {
@@ -103,31 +104,33 @@ function configureSortingParameters(parameters, genre) {
 }
 
 async function getFavorites(type, language, page, genre, sessionId) {
+    const canonicalType = toCanonicalType(type);
     moviedb.sessionId = sessionId;
     let parameters = { language, page };
     parameters = configureSortingParameters(parameters, genre);
 
-    const genreList = await getGenreList(language, type);
-    const fetchFunction = type === "movie" ? moviedb.accountFavoriteMovies.bind(moviedb) : moviedb.accountFavoriteTv.bind(moviedb);
+    const genreList = await getGenreList(language, canonicalType);
+    const fetchFunction = canonicalType === "movie" ? moviedb.accountFavoriteMovies.bind(moviedb) : moviedb.accountFavoriteTv.bind(moviedb);
 
     return fetchFunction(parameters)
         .then((res) => ({
-            metas: sortResults(res.results, genre).map(el => parseMedia(el, type, genreList))
+            metas: sortResults(res.results, genre).map(el => parseMedia(el, canonicalType, genreList))
         }))
         .catch(console.error);
 }
 
 async function getWatchList(type, language, page, genre, sessionId) {
+    const canonicalType = toCanonicalType(type);
     moviedb.sessionId = sessionId;
     let parameters = { language, page };
     parameters = configureSortingParameters(parameters, genre);
 
-    const genreList = await getGenreList(language, type);
-    const fetchFunction = type === "movie" ? moviedb.accountMovieWatchlist.bind(moviedb) : moviedb.accountTvWatchlist.bind(moviedb);
+    const genreList = await getGenreList(language, canonicalType);
+    const fetchFunction = canonicalType === "movie" ? moviedb.accountMovieWatchlist.bind(moviedb) : moviedb.accountTvWatchlist.bind(moviedb);
 
     return fetchFunction(parameters)
         .then((res) => ({
-            metas: sortResults(res.results, genre).map(el => parseMedia(el, type, genreList))
+            metas: sortResults(res.results, genre).map(el => parseMedia(el, canonicalType, genreList))
         }))
         .catch(console.error);
 }

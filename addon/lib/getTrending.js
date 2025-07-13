@@ -3,9 +3,11 @@ const { MovieDb } = require("moviedb-promise");
 const moviedb = new MovieDb(process.env.TMDB_API);
 const { parseMedia } = require("../utils/parseProps");
 const { getGenreList } = require("./getGenreList");
+const { toCanonicalType } = require("../utils/typeCanonical");
 
 async function getTrending(type, language, page, genre, config) {
-  const media_type = type === "series" ? "tv" : "movie";
+  const canonicalType = toCanonicalType(type);
+  const media_type = canonicalType === "series" ? "tv" : "movie";
   const parameters = {
     media_type,
     time_window: genre ? genre.toLowerCase() : "day",
@@ -13,12 +15,12 @@ async function getTrending(type, language, page, genre, config) {
     page,
   };
 
-  const genreList = await getGenreList(language, type);
+  const genreList = await getGenreList(language, canonicalType);
 
   return await moviedb
     .trending(parameters)
     .then((res) => {
-      const metas = res.results.map(item => parseMedia(item, media_type, genreList));
+      const metas = res.results.map(item => parseMedia(item, canonicalType, genreList));
       return { metas };
     })
     .catch(console.error);

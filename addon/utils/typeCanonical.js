@@ -8,7 +8,8 @@ const labelToType = {
   [typeLabels.movie]: "movie",
   [typeLabels.series]: "series",
   movie: "movie",
-  series: "series"
+  series: "series",
+  tv: "series"  // Handle TMDB API inconsistency
 };
 
 function toCanonicalType(input) {
