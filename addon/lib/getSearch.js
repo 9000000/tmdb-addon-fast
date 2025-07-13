@@ -41,12 +41,12 @@ async function getSearch(id, type, language, query, config) {
           if (type === "movie") {
             const res = await moviedb.searchMovie(parameters);
             if (res.results && res.results.length > 0) {
-              return parseMedia(res.results[0], type, genreList);
+              return parseMedia(res.results[0], "movie", genreList);
             }
           } else {
             const res = await moviedb.searchTv(parameters);
             if (res.results && res.results.length > 0) {
-              return parseMedia(res.results[0], type, genreList);
+              return parseMedia(res.results[0], "tv", genreList);
             }
           }
           return null;
@@ -95,7 +95,7 @@ async function getSearch(id, type, language, query, config) {
       await moviedb
         .searchMovie(parameters)
         .then((res) => {
-          res.results.map((el) => {searchResults.push(parseMedia(el, type, genreList));});
+          res.results.map((el) => {searchResults.push(parseMedia(el, "movie", genreList));});
         })
         .catch(console.error);
 
@@ -103,7 +103,7 @@ async function getSearch(id, type, language, query, config) {
         await moviedb
           .searchMovie({ query: searchQuery, language, include_adult: config.includeAdult })
           .then((res) => {
-            res.results.map((el) => {searchResults.push(parseMedia(el, type, genreList));});
+            res.results.map((el) => {searchResults.push(parseMedia(el, "movie", genreList));});
           })
           .catch(console.error);
       }
@@ -115,13 +115,13 @@ async function getSearch(id, type, language, query, config) {
             .then((credits) => {
               credits.cast.map((el) => {
                 if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                  searchResults.push(parseMedia(el, type, genreList));
+                  searchResults.push(parseMedia(el, "movie", genreList));
                 }
               });
               credits.crew.map((el) => {
                 if (el.job === "Director" || el.job === "Writer") {
                   if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                    searchResults.push(parseMedia(el, type, genreList));
+                    searchResults.push(parseMedia(el, "movie", genreList));
                   }
                 }
               });
@@ -132,7 +132,7 @@ async function getSearch(id, type, language, query, config) {
       await moviedb
         .searchTv(parameters)
         .then((res) => {
-          res.results.map((el) => {searchResults.push(parseMedia(el, type, genreList))});
+          res.results.map((el) => {searchResults.push(parseMedia(el, "tv", genreList))});
         })
         .catch(console.error);
 
@@ -140,7 +140,7 @@ async function getSearch(id, type, language, query, config) {
         await moviedb
           .searchTv({ query: searchQuery, language, include_adult: config.includeAdult })
           .then((res) => {
-            res.results.map((el) => {searchResults.push(parseMedia(el, type, genreList))});
+            res.results.map((el) => {searchResults.push(parseMedia(el, "tv", genreList))});
           })
           .catch(console.error);
       }
@@ -153,14 +153,14 @@ async function getSearch(id, type, language, query, config) {
               credits.cast.map((el) => {
                 if (el.episode_count >= 5) {
                   if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                    searchResults.push(parseMedia(el, type, genreList));
+                    searchResults.push(parseMedia(el, "tv", genreList));
                   }
                 }
               });
               credits.crew.map((el) => {
                 if (el.job === "Director" || el.job === "Writer") {
                   if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                    searchResults.push(parseMedia(el, type, genreList));
+                    searchResults.push(parseMedia(el, "tv", genreList));
                   }
                 }
               });

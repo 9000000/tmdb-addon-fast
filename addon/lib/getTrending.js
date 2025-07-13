@@ -20,7 +20,11 @@ async function getTrending(type, language, page, genre, config) {
   return await moviedb
     .trending(parameters)
     .then((res) => {
-      const metas = res.results.map(item => parseMedia(item, canonicalType, genreList));
+      const metas = res.results.map(item => {
+        // TMDB trending API returns items with media_type field
+        const itemType = item.media_type || media_type;
+        return parseMedia(item, itemType, genreList);
+      });
       return { metas };
     })
     .catch(console.error);

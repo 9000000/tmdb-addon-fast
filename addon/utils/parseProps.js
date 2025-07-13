@@ -214,31 +214,53 @@ async function parsePoster(type, id, poster, language, rpdbkey) {
 }
 
 function parseMedia(el, type, genreList = []) {
-  // Handle TMDB API type inconsistency: 'tv' should be treated as 'series'
-  let normalizedType = type;
-  if (type === 'tv') normalizedType = 'series';
-  
-  const canonicalType = toCanonicalType(normalizedType);
-  if (canonicalType !== "movie" && canonicalType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in parseMedia: ${canonicalType}, original type: ${type}`);
-  }
-  
-  const genres = Array.isArray(el.genre_ids) 
-    ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
-    : [];
+  try {
+    // Handle TMDB API type inconsistency: 'tv' should be treated as 'series'
+    let normalizedType = type;
+    if (type === 'tv') normalizedType = 'series';
+    
+    const canonicalType = toCanonicalType(normalizedType);
+    if (canonicalType !== "movie" && canonicalType !== "series") {
+      console.error(`[ERROR] Unexpected canonical type in parseMedia: ${canonicalType}, original type: ${type}`);
+    }
+    
+    // Safe genre parsing with error handling
+    let genres = [];
+    if (Array.isArray(el.genre_ids)) {
+      genres = el.genre_ids.map(genre => {
+        const found = genreList.find((x) => x.id === genre);
+        return found ? found.name : 'Unknown';
+      }).filter(name => name !== 'Unknown'); // Remove Unknown genres
+    }
 
-  return {
-    id: `tmdb:${el.id}`,
-    name: el.title || el.name,
-    genre: genres,
-    poster: `https://image.tmdb.org/t/p/w500${el.poster_path}`,
-    background: `https://image.tmdb.org/t/p/original${el.backdrop_path}`,
-    posterShape: "regular",
-    imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
-    year: canonicalType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
-    type: canonicalType,
-    description: el.overview,
-  };
+    return {
+      id: `tmdb:${el.id}`,
+      name: el.title || el.name || 'Unknown Title',
+      genre: genres,
+      poster: el.poster_path ? `https://image.tmdb.org/t/p/w500${el.poster_path}` : null,
+      background: el.backdrop_path ? `https://image.tmdb.org/t/p/original${el.backdrop_path}` : null,
+      posterShape: "regular",
+      imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
+      year: canonicalType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+      type: canonicalType,
+      description: el.overview || '',
+    };
+  } catch (error) {
+    console.error(`[ERROR] Failed to parse media item:`, error, 'Item:', el);
+    // Return a minimal valid object
+    return {
+      id: `tmdb:${el.id || 'unknown'}`,
+      name: el.title || el.name || 'Error parsing item',
+      genre: [],
+      poster: null,
+      background: null,
+      posterShape: "regular",
+      imdbRating: 'N/A',
+      year: '',
+      type: toCanonicalType(type),
+      description: 'Error occurred while parsing this item',
+    };
+  }
 }
 
 function getRpdbPoster(type, id, language, rpdbkey) {

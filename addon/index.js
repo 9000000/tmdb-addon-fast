@@ -92,39 +92,80 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
 
 addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
   const { catalogChoices, type, id, extra } = req.params;
+  
+  // Debug logging
+  console.log(`[DEBUG] Catalog request - Original type: "${type}", ID: "${id}", Extra: "${extra}"`);
+  
   const canonicalType = toCanonicalType(type); // Canonicalize type at entry point
+  console.log(`[DEBUG] Canonical type: "${canonicalType}"`);
+  
   const config = parseConfig(catalogChoices) || {};
   const language = config.language || DEFAULT_LANGUAGE;
   const rpdbkey = config.rpdbkey
   const sessionId = config.sessionId
   
   const extraParams = extra ? Object.fromEntries(new URLSearchParams(extra).entries()) : {};
+  console.log(`[DEBUG] Extra params:`, extraParams);
   
-  const { genre, skip, search } = extraParams;
+  // Properly decode genre parameter for international characters
+  const { skip, search } = extraParams;
+  let { genre } = extraParams;
+  if (genre) {
+    try {
+      genre = decodeURIComponent(genre);
+      console.log(`[DEBUG] Decoded genre: "${genre}"`);
+    } catch (e) {
+      console.warn(`[WARNING] Failed to decode genre: "${genre}"`);
+    }
+  }
+  
   const page = Math.ceil(skip ? skip / 100 + 1 : undefined) || 1;
+  console.log(`[DEBUG] Page: ${page}, Genre: "${genre}", Skip: ${skip}`);
+  
   let metas = [];
   try {
     const args = [canonicalType, language, page]; // Use canonical type
 
     if (search) {
+      console.log(`[DEBUG] Executing search for: "${search}"`);
       metas = await getSearch(id, canonicalType, language, search, config);
     } else {
       switch (id) {
         case "tmdb.trending":
+          console.log(`[DEBUG] Executing getTrending with genre: "${genre}"`);
           metas = await getTrending(...args, genre, config);
           break;
         case "tmdb.favorites":
+          console.log(`[DEBUG] Executing getFavorites with sessionId: ${sessionId ? 'set' : 'not set'}`);
           metas = await getFavorites(...args, genre, sessionId);
           break;
         case "tmdb.watchlist":
+          console.log(`[DEBUG] Executing getWatchList with sessionId: ${sessionId ? 'set' : 'not set'}`);
           metas = await getWatchList(...args, genre, sessionId);
           break;
         default:
+          console.log(`[DEBUG] Executing getCatalog with id: "${id}", genre: "${genre}"`);
           metas = await getCatalog(...args, id, genre, config);
           break;
       }
     }
+    console.log(`[DEBUG] Retrieved ${metas?.metas?.length || 0} items from ${metas?.constructor?.name || 'unknown source'}`);
+    
+    // Additional validation
+    if (metas?.metas) {
+      const sampleItem = metas.metas[0];
+      if (sampleItem) {
+        console.log(`[DEBUG] Sample item:`, {
+          id: sampleItem.id,
+          name: sampleItem.name,
+          type: sampleItem.type,
+          year: sampleItem.year,
+          hasGenre: Array.isArray(sampleItem.genre) && sampleItem.genre.length > 0
+        });
+      }
+    }
   } catch (e) {
+    console.error(`[ERROR] Catalog request failed:`, e);
     res.status(404).send((e || {}).message || "Not found");
     return;
   }
@@ -220,6 +261,172 @@ addon.get("/api/image/blur", async function (req, res) {
     console.error('Erro na rota de blur:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+});
+
+// Diagnostic endpoint for testing type canonicalization
+addon.get("/debug/test-types", function (req, res) {
+  const testCases = [
+    'movie',
+    'series', 
+    'tv',
+    'Detaylı Filtre (Film) 🔎',
+    'Detaylı Filtre (Dizi) 🔎',
+    'unknown'
+  ];
+  
+  const results = testCases.map(type => ({
+    input: type,
+    canonical: toCanonicalType(type),
+    isValid: ['movie', 'series'].includes(toCanonicalType(type))
+  }));
+  
+  res.json({
+    typeCanonicalTest: results,
+    environment: {
+      nodeVersion: process.version,
+      hostname: process.env.HOST_NAME,
+      defaultLanguage: DEFAULT_LANGUAGE
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Verification endpoint to confirm code version
+addon.get("/debug/version", function (req, res) {
+  res.json({
+    version: "COMPREHENSIVE_DEEP_FIXES_2025_07_13_v3",
+    packageVersion: require("../package.json").version,
+    hasTypeCanonical: typeof toCanonicalType === 'function',
+    codebasePath: __dirname,
+    timestamp: new Date().toISOString(),
+    fixes: [
+      "Type canonicalization at API entry points",
+      "Fixed parseMedia function for tv/series",
+      "Fixed getMeta IMDB ID extraction", 
+      "Fixed all backend functions to use canonical types",
+      "Added comprehensive error logging",
+      "CRITICAL: Fixed TMDB API type mismatch in getCatalog.js",
+      "CRITICAL: Fixed TMDB API type mismatch in getSearch.js", 
+      "CRITICAL: Fixed TMDB API type mismatch in getTrending.js",
+      "CRITICAL: Fixed TMDB API type mismatch in getPersonalLists.js",
+      "Enhanced URL parameter decoding for international characters",
+      "Added robust error handling in parseMedia function",
+      "Improved genre filtering and validation",
+      "Enhanced debug logging throughout catalog pipeline"
+    ]
+  });
+});
+
+// Comprehensive flow test endpoint
+addon.get("/debug/test-flow", async function (req, res) {
+  const testResults = {
+    timestamp: new Date().toISOString(),
+    tests: []
+  };
+
+  // Test 1: Type canonicalization
+  const typeTests = [
+    'movie',
+    'series', 
+    'tv',
+    'Detaylı Filtre (Film) 🔎',
+    'Detaylı Filtre (Dizi) 🔎'
+  ];
+  
+  testResults.tests.push({
+    name: "Type Canonicalization",
+    results: typeTests.map(type => ({
+      input: type,
+      canonical: toCanonicalType(type),
+      isValid: ['movie', 'series'].includes(toCanonicalType(type))
+    }))
+  });
+
+  // Test 2: parseMedia function with TMDB types
+  try {
+    const testMovie = {
+      id: 123,
+      title: "Test Movie",
+      release_date: "2023-01-01",
+      poster_path: "/test.jpg",
+      backdrop_path: "/test_backdrop.jpg",
+      vote_average: 8.5,
+      overview: "Test overview"
+    };
+    
+    const testTv = {
+      id: 456,
+      name: "Test Series",
+      first_air_date: "2023-01-01",
+      poster_path: "/test_tv.jpg",
+      backdrop_path: "/test_tv_backdrop.jpg",
+      vote_average: 9.0,
+      overview: "Test TV overview"
+    };
+
+    const { parseMedia } = require("./utils/parseProps");
+    
+    const movieParsed = parseMedia(testMovie, "movie", []);
+    const tvParsed = parseMedia(testTv, "tv", []);
+    
+    testResults.tests.push({
+      name: "parseMedia Function",
+      results: [
+        {
+          input: "movie",
+          output: movieParsed,
+          correctType: movieParsed.type === "movie",
+          hasYear: !!movieParsed.year
+        },
+        {
+          input: "tv",
+          output: tvParsed,
+          correctType: tvParsed.type === "series",
+          hasYear: !!tvParsed.year
+        }
+      ]
+    });
+  } catch (error) {
+    testResults.tests.push({
+      name: "parseMedia Function",
+      error: error.message
+    });
+  }
+
+  // Test 3: Config parsing with Turkish types
+  try {
+    const testConfigs = [
+      '{"language":"tr-TR","catalogs":[{"type":"Detaylı Filtre (Film) 🔎","id":"tmdb.top"}]}',
+      '{"language":"en-US","catalogs":[{"type":"movie","id":"tmdb.top"}]}'
+    ];
+    
+    const configResults = testConfigs.map(configStr => {
+      try {
+        const config = JSON.parse(configStr);
+        return {
+          input: configStr,
+          parsed: config,
+          hasValidTypes: config.catalogs?.every(cat => 
+            ['movie', 'series', 'Detaylı Filtre (Film) 🔎', 'Detaylı Filtre (Dizi) 🔎'].includes(cat.type)
+          )
+        };
+      } catch (e) {
+        return { input: configStr, error: e.message };
+      }
+    });
+    
+    testResults.tests.push({
+      name: "Config Parsing",
+      results: configResults
+    });
+  } catch (error) {
+    testResults.tests.push({
+      name: "Config Parsing",
+      error: error.message
+    });
+  }
+
+  res.json(testResults);
 });
 
 module.exports = addon;

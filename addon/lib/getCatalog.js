@@ -17,7 +17,7 @@ async function getCatalog(type, language, page, id, genre, config) {
     const listId = id.split(".")[1];
     let filteredMetas = [];
     let currentPage = 1;
-    const pageSize = 20;
+    const pageSize = 100; // Standard Stremio page size
     const needed = page * pageSize;
 
     while (filteredMetas.length < needed) {
@@ -66,7 +66,10 @@ async function getCatalog(type, language, page, id, genre, config) {
 
   return fetchFunction(parameters)
     .then((res) => {
-      const metas = res.results.map(item => parseMedia(item, type, genreList));
+      // TMDB API returns items with implicit type based on endpoint:
+      // discoverMovie returns movie items, discoverTv returns tv items
+      const tmdbType = type === "movie" ? "movie" : "tv";
+      const metas = res.results.map(item => parseMedia(item, tmdbType, genreList));
       return { metas };
     })
     .catch(console.error);

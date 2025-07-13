@@ -113,9 +113,13 @@ async function getFavorites(type, language, page, genre, sessionId) {
     const fetchFunction = canonicalType === "movie" ? moviedb.accountFavoriteMovies.bind(moviedb) : moviedb.accountFavoriteTv.bind(moviedb);
 
     return fetchFunction(parameters)
-        .then((res) => ({
-            metas: sortResults(res.results, genre).map(el => parseMedia(el, canonicalType, genreList))
-        }))
+        .then((res) => {
+            // TMDB account API returns movie objects for accountFavoriteMovies and tv objects for accountFavoriteTv
+            const tmdbType = canonicalType === "movie" ? "movie" : "tv";
+            return {
+                metas: sortResults(res.results, genre).map(el => parseMedia(el, tmdbType, genreList))
+            };
+        })
         .catch(console.error);
 }
 
@@ -129,9 +133,13 @@ async function getWatchList(type, language, page, genre, sessionId) {
     const fetchFunction = canonicalType === "movie" ? moviedb.accountMovieWatchlist.bind(moviedb) : moviedb.accountTvWatchlist.bind(moviedb);
 
     return fetchFunction(parameters)
-        .then((res) => ({
-            metas: sortResults(res.results, genre).map(el => parseMedia(el, canonicalType, genreList))
-        }))
+        .then((res) => {
+            // TMDB account API returns movie objects for accountMovieWatchlist and tv objects for accountTvWatchlist
+            const tmdbType = canonicalType === "movie" ? "movie" : "tv";
+            return {
+                metas: sortResults(res.results, genre).map(el => parseMedia(el, tmdbType, genreList))
+            };
+        })
         .catch(console.error);
 }
 
