@@ -235,22 +235,41 @@ function parseMedia(el, type, genreList = []) {
     
     // Safe genre parsing with error handling
     let genres = [];
-    if (Array.isArray(el.genre_ids)) {
-      genres = el.genre_ids.map(genre => {
-        const found = genreList.find((x) => x.id === genre);
-        return found ? found.name : 'Unknown';
-      }).filter(name => name !== 'Unknown'); // Remove Unknown genres
+    if (Array.isArray(el.genre_ids) && genreList.length > 0) {
+      genres = el.genre_ids.map(genreId => {
+        const found = genreList.find(g => g.id === genreId);
+        return found ? found.name : null;
+      }).filter(name => name !== null); // Remove null genres, keep valid ones
+      
+      // If no genres were found but genre_ids exist, log for debugging
+      if (genres.length === 0 && el.genre_ids.length > 0) {
+        console.warn(`[WARNING] No genre names found for genre_ids: ${el.genre_ids} in item ${el.id}`);
+      }
+    }
+
+    // Ensure year is always a string and properly formatted
+    let year = '';
+    if (canonicalType === 'movie' && el.release_date) {
+      year = el.release_date.substr(0, 4);
+    } else if (canonicalType === 'series' && el.first_air_date) {
+      year = el.first_air_date.substr(0, 4);
+    }
+    
+    // Validate year format for discovery page compatibility
+    if (year && !/^\d{4}$/.test(year)) {
+      console.warn(`[WARNING] Invalid year format: ${year} for item ${el.id}`);
+      year = '';
     }
 
     return {
       id: `tmdb:${el.id}`,
       name: el.title || el.name || 'Unknown Title',
-      genre: genres,
+      genre: genres, // Array of genre strings, properly filtered
       poster: el.poster_path ? `https://image.tmdb.org/t/p/w500${el.poster_path}` : null,
       background: el.backdrop_path ? `https://image.tmdb.org/t/p/original${el.backdrop_path}` : null,
       posterShape: "regular",
       imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
-      year: canonicalType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+      year: year, // Properly validated year string
       type: canonicalType,
       description: el.overview || '',
     };

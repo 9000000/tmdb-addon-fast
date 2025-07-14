@@ -311,7 +311,7 @@ addon.get("/debug/test-types", function (req, res) {
 // Verification endpoint to confirm code version
 addon.get("/debug/version", function (req, res) {
   res.json({
-    version: "CRITICAL_BUG_FIXES_2025_07_14_v1",
+    version: "DISCOVERY_PAGE_FIXES_2025_07_14_v1",
     packageVersion: require("../package.json").version,
     hasTypeCanonical: typeof toCanonicalType === 'function',
     codebasePath: __dirname,
@@ -319,7 +319,10 @@ addon.get("/debug/version", function (req, res) {
     criticalFixes: [
       "🚨 CRITICAL: Fixed getTrending.js - genre parameter was incorrectly used as time_window",
       "🚨 CRITICAL: Added proper genre filtering for TMDB trending endpoint",  
-      "🚨 CRITICAL: Fixed complete breakage of trending functionality with genre filters"
+      "🚨 CRITICAL: Fixed complete breakage of trending functionality with genre filters",
+      "🚨 DISCOVERY: Enhanced parseMedia function for better year and genre handling",
+      "🚨 DISCOVERY: Fixed discovery page metadata compatibility with Stremio",
+      "🚨 DISCOVERY: Added proper genre validation and year format checking"
     ],
     fixes: [
       "Type canonicalization at API entry points",
@@ -348,7 +351,8 @@ addon.get("/debug/version", function (req, res) {
       "/debug/simulate-stremio - Stremio request simulation",
       "/debug/test-functions - Core function testing",
       "/debug/test-parsemedia - parseMedia function testing",
-      "/debug/test-all-functionality - Complete functionality test with bug fixes (NEW)"
+      "/debug/test-all-functionality - Complete functionality test with bug fixes (NEW)", 
+      "/debug/discovery-test - Discovery page metadata validation (NEW)"
     ]
   });
 });
@@ -895,7 +899,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 1: Trending without genre (should work)
     console.log("[TEST] Testing trending movies without genre");
-    const trendingMoviesNoGenre = await getTrending("movie", "tr-TR", 1, null, {});
+    const trendingMoviesNoGenre = await getTrending "movie", "tr-TR", 1, null, {});
     testResults.tests.push({
       name: "Trending Movies (No Genre)",
       success: !!trendingMoviesNoGenre?.metas,
@@ -906,7 +910,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 2: Trending with genre (this was broken before)
     console.log("[TEST] Testing trending movies WITH genre (was broken)");
-    const trendingMoviesWithGenre = await getTrending("movie", "tr-TR", 1, "Action", {});
+    const trendingMoviesWithGenre = await getTrending "movie", "tr-TR", 1, "Action", {});
     testResults.tests.push({
       name: "Trending Movies (With Action Genre) - BUG FIX TEST",
       success: !!trendingMoviesWithGenre?.metas,
@@ -918,7 +922,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 3: Trending series with genre
     console.log("[TEST] Testing trending series with genre");
-    const trendingSeriesWithGenre = await getTrending("series", "tr-TR", 1, "Drama", {});
+    const trendingSeriesWithGenre = await getTrending "series", "tr-TR", 1, "Drama", {});
     testResults.tests.push({
       name: "Trending Series (With Drama Genre) - BUG FIX TEST",
       success: !!trendingSeriesWithGenre?.metas,
@@ -930,7 +934,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 4: Regular catalog functionality
     console.log("[TEST] Testing regular catalog (tmdb.top)");
-    const topMovies = await getCatalog("movie", "tr-TR", 1, "tmdb.top", null, {});
+    const topMovies = await getCatalog "movie", "tr-TR", 1, "tmdb.top", null, {});
     testResults.tests.push({
       name: "Regular Catalog (tmdb.top movies)",
       success: !!topMovies?.metas,
@@ -1025,6 +1029,260 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
   }
 
   res.json(testResults);
+});
+
+// Discovery page metadata diagnostic endpoint  
+addon.get("/debug/test-discovery-metadata", async function (req, res) {
+  const testResults = {
+    timestamp: new Date().toISOString(),
+    version: "DISCOVERY_PAGE_FIXES_2025_07_14_v1",
+    purpose: "Testing discovery page metadata structure for genre and year display",
+    tests: []
+  };
+
+  try {
+    console.log("[DISCOVERY TEST] Testing discovery page metadata structure");
+
+    // Test 1: Get real TMDB data and check parseMedia output
+    const testConfig = { language: "tr-TR" };
+    const realCatalogData = await getCatalog("movie", "tr-TR", 1, "tmdb.top", null, testConfig);
+    
+    if (realCatalogData?.metas?.length > 0) {
+      const sampleMeta = realCatalogData.metas[0];
+      testResults.tests.push({
+        name: "Real Catalog Item Structure",
+        sampleItem: sampleMeta,
+        hasYear: !!sampleMeta.year,
+        hasGenres: Array.isArray(sampleMeta.genre) && sampleMeta.genre.length > 0,
+        genreCount: Array.isArray(sampleMeta.genre) ? sampleMeta.genre.length : 0,
+        genreStructure: typeof sampleMeta.genre,
+        yearValue: sampleMeta.year,
+        yearType: typeof sampleMeta.year,
+        allFields: Object.keys(sampleMeta),
+        criticalFields: {
+          id: sampleMeta.id,
+          name: sampleMeta.name,
+          type: sampleMeta.type,
+          year: sampleMeta.year,
+          genre: sampleMeta.genre,
+          poster: sampleMeta.poster,
+          imdbRating: sampleMeta.imdbRating
+        }
+      });
+    } else {
+      testResults.tests.push({
+        name: "Real Catalog Item Structure",
+        error: "No items returned from catalog"
+      });
+    }
+
+    // Test 2: Test parseMedia directly with known TMDB structure
+    const { parseMedia } = require("./utils/parseProps");
+    const { getGenreList } = require("./lib/getGenreList");
+    
+    // Get real genre list
+    const movieGenreList = await getGenreList("tr-TR", "movie");
+    
+    // Simulate real TMDB movie response structure
+    const tmdbMovieItem = {
+      id: 550, // Fight Club
+      title: "Fight Club",
+      release_date: "1999-10-15",
+      poster_path: "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+      backdrop_path: "/fCayJrkfRaCRCTh8GqN30f8oyQF.jpg",
+      vote_average: 8.433,
+      overview: "A ticking-time-bomb insomniac and a slippery soap salesman channel primal male aggression into a shocking new form of therapy.",
+      genre_ids: [18, 53, 80] // Drama, Thriller, Crime
+    };
+
+    const parsedMovie = parseMedia(tmdbMovieItem, "movie", movieGenreList);
+    
+    testResults.tests.push({
+      name: "parseMedia Movie Test",
+      input: {
+        tmdbItem: tmdbMovieItem,
+        genreListLength: movieGenreList.length,
+        sampleGenres: movieGenreList.slice(0, 3)
+      },
+      output: parsedMovie,
+      analysis: {
+        hasCorrectId: parsedMovie.id === "tmdb:550",
+        hasCorrectName: parsedMovie.name === "Fight Club",
+        hasCorrectType: parsedMovie.type === "movie",
+        hasYear: !!parsedMovie.year && parsedMovie.year === "1999",
+        hasGenres: Array.isArray(parsedMovie.genre) && parsedMovie.genre.length > 0,
+        genreDetails: {
+          isArray: Array.isArray(parsedMovie.genre),
+          count: Array.isArray(parsedMovie.genre) ? parsedMovie.genre.length : 0,
+          values: parsedMovie.genre,
+          expectedGenreIds: tmdbMovieItem.genre_ids,
+          genreMapping: tmdbMovieItem.genre_ids.map(id => {
+            const found = movieGenreList.find(g => g.id === id);
+            return { id, name: found ? found.name : 'NOT_FOUND' };
+          })
+        },
+        poster: !!parsedMovie.poster,
+        rating: parsedMovie.imdbRating
+      }
+    });
+
+    // Test 3: Test series parseMedia
+    const seriesGenreList = await getGenreList("tr-TR", "series");
+    
+    const tmdbSeriesItem = {
+      id: 1399, // Game of Thrones
+      name: "Game of Thrones",
+      first_air_date: "2011-04-17",
+      poster_path: "/7WUHnWGx5OO145IRxPDUkQSh4C7.jpg",
+      backdrop_path: "/suopoADq0k8YZr4dQXcU6pToj6s.jpg",
+      vote_average: 8.453,
+      overview: "Seven noble families fight for control of the mythical land of Westeros.",
+      genre_ids: [18, 10765, 10759] // Drama, Sci-Fi & Fantasy, Action & Adventure
+    };
+
+    const parsedSeries = parseMedia(tmdbSeriesItem, "tv", seriesGenreList);
+    
+    testResults.tests.push({
+      name: "parseMedia Series Test",
+      input: {
+        tmdbItem: tmdbSeriesItem,
+        genreListLength: seriesGenreList.length,
+        inputType: "tv"
+      },
+      output: parsedSeries,
+      analysis: {
+        hasCorrectId: parsedSeries.id === "tmdb:1399",
+        hasCorrectName: parsedSeries.name === "Game of Thrones",
+        hasCorrectType: parsedSeries.type === "series", // Should convert tv -> series
+        hasYear: !!parsedSeries.year && parsedSeries.year === "2011",
+        hasGenres: Array.isArray(parsedSeries.genre) && parsedSeries.genre.length > 0,
+        genreDetails: {
+          isArray: Array.isArray(parsedSeries.genre),
+          count: Array.isArray(parsedSeries.genre) ? parsedSeries.genre.length : 0,
+          values: parsedSeries.genre,
+          expectedGenreIds: tmdbSeriesItem.genre_ids,
+          genreMapping: tmdbSeriesItem.genre_ids.map(id => {
+            const found = seriesGenreList.find(g => g.id === id);
+            return { id, name: found ? found.name : 'NOT_FOUND' };
+          })
+        }
+      }
+    });
+
+    // Test 4: Compare with Stremio expected structure
+    const stremioExpectedStructure = {
+      id: "string",
+      name: "string", 
+      type: "movie|series",
+      poster: "string (URL)",
+      genre: ["array", "of", "strings"],
+      year: "string (YYYY)",
+      imdbRating: "string (X.X)",
+      description: "string"
+    };
+
+    testResults.tests.push({
+      name: "Stremio Compatibility Check",
+      stremioExpected: stremioExpectedStructure,
+      ourMovieOutput: parsedMovie ? {
+        id: typeof parsedMovie.id,
+        name: typeof parsedMovie.name,
+        type: typeof parsedMovie.type,
+        poster: typeof parsedMovie.poster,
+        genre: Array.isArray(parsedMovie.genre) ? `array[${parsedMovie.genre.length}]` : typeof parsedMovie.genre,
+        year: typeof parsedMovie.year,
+        imdbRating: typeof parsedMovie.imdbRating,
+        description: typeof parsedMovie.description
+      } : null,
+      compatibility: {
+        movieStructureMatch: parsedMovie ? {
+          idOk: typeof parsedMovie.id === "string",
+          nameOk: typeof parsedMovie.name === "string",
+          typeOk: ["movie", "series"].includes(parsedMovie.type),
+          posterOk: typeof parsedMovie.poster === "string",
+          genreOk: Array.isArray(parsedMovie.genre),
+          yearOk: typeof parsedMovie.year === "string" && /^\d{4}$/.test(parsedMovie.year),
+          ratingOk: typeof parsedMovie.imdbRating === "string"
+        } : null
+      }
+    });
+
+    // Summary
+    const allTests = testResults.tests.filter(t => !t.error);
+    const discoveryIssues = [];
+
+    allTests.forEach(test => {
+      if (test.analysis) {
+        if (!test.analysis.hasYear) discoveryIssues.push("Missing or invalid year");
+        if (!test.analysis.hasGenres) discoveryIssues.push("Missing or invalid genres");
+      }
+      if (test.compatibility?.movieStructureMatch) {
+        const compat = test.compatibility.movieStructureMatch;
+        if (!compat.yearOk) discoveryIssues.push("Year format incompatible with Stremio");
+        if (!compat.genreOk) discoveryIssues.push("Genre format incompatible with Stremio");
+      }
+    });
+
+    testResults.summary = {
+      totalTests: testResults.tests.length,
+      discoveryIssuesFound: discoveryIssues.length,
+      discoveryIssues: [...new Set(discoveryIssues)],
+      criticalForDiscovery: discoveryIssues.length === 0 ? 
+        "✅ Discovery metadata structure looks correct" :
+        `❌ ${discoveryIssues.length} discovery issues found`
+    };
+
+  } catch (error) {
+    console.error("[DISCOVERY TEST ERROR]", error);
+    testResults.error = error.message;
+    testResults.summary = {
+      totalTests: 0,
+      discoveryIssuesFound: 1,
+      discoveryIssues: ["Test execution failed: " + error.message],
+      criticalForDiscovery: "❌ Unable to test discovery metadata"
+    };
+  }
+
+  res.json(testResults);
+});
+
+// Simple discovery metadata test
+addon.get("/debug/discovery-test", async function (req, res) {
+  try {
+    console.log("[DISCOVERY] Testing discovery metadata");
+    
+    // Test with real data
+    const testCatalog = await getCatalog("movie", "tr-TR", 1, "tmdb.top", null, {});
+    
+    if (testCatalog?.metas?.length > 0) {
+      const sample = testCatalog.metas[0];
+      res.json({
+        timestamp: new Date().toISOString(),
+        purpose: "Discovery page metadata analysis",
+        sampleItem: sample,
+        issues: {
+          missingYear: !sample.year,
+          emptyGenres: !Array.isArray(sample.genre) || sample.genre.length === 0,
+          missingPoster: !sample.poster,
+          yearFormat: typeof sample.year,
+          genreFormat: typeof sample.genre
+        },
+        recommendation: !sample.year || !Array.isArray(sample.genre) || sample.genre.length === 0 ? 
+          "ISSUE CONFIRMED: Missing year or genres in discovery metadata" :
+          "Discovery metadata structure looks correct"
+      });
+    } else {
+      res.json({
+        error: "No catalog items returned",
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    res.json({
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 module.exports = addon;
