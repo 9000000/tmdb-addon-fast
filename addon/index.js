@@ -899,7 +899,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 1: Trending without genre (should work)
     console.log("[TEST] Testing trending movies without genre");
-    const trendingMoviesNoGenre = await getTrending "movie", "tr-TR", 1, null, {});
+    const trendingMoviesNoGenre = await getTrending("movie", "tr-TR", 1, null, {});
     testResults.tests.push({
       name: "Trending Movies (No Genre)",
       success: !!trendingMoviesNoGenre?.metas,
@@ -910,7 +910,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 2: Trending with genre (this was broken before)
     console.log("[TEST] Testing trending movies WITH genre (was broken)");
-    const trendingMoviesWithGenre = await getTrending "movie", "tr-TR", 1, "Action", {});
+    const trendingMoviesWithGenre = await getTrending("movie", "tr-TR", 1, "Action", {});
     testResults.tests.push({
       name: "Trending Movies (With Action Genre) - BUG FIX TEST",
       success: !!trendingMoviesWithGenre?.metas,
@@ -922,7 +922,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 3: Trending series with genre
     console.log("[TEST] Testing trending series with genre");
-    const trendingSeriesWithGenre = await getTrending "series", "tr-TR", 1, "Drama", {});
+    const trendingSeriesWithGenre = await getTrending("series", "tr-TR", 1, "Drama", {});
     testResults.tests.push({
       name: "Trending Series (With Drama Genre) - BUG FIX TEST",
       success: !!trendingSeriesWithGenre?.metas,
@@ -934,13 +934,13 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
 
     // Test 4: Regular catalog functionality
     console.log("[TEST] Testing regular catalog (tmdb.top)");
-    const topMovies = await getCatalog "movie", "tr-TR", 1, "tmdb.top", null, {});
+    const topMovies = await getCatalog("movie", "tr-TR", 1, "tmdb.top", null, {});
     testResults.tests.push({
-      name: "Regular Catalog (tmdb.top movies)",
+      name: "Top Movies Catalog",
       success: !!topMovies?.metas,
       itemCount: topMovies?.metas?.length || 0,
       sampleItem: topMovies?.metas?.[0] || null,
-      details: "Ensuring regular catalog still works"
+      details: "Testing regular catalog functionality"
     });
 
     // Test 5: Type canonicalization verification
