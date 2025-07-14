@@ -1014,7 +1014,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
         "✅ CRITICAL BUG FIXES SUCCESSFUL - Trending with genre filtering now works!" :
         "❌ Critical issues remain - trending genre filtering still broken"
     };
-
+    res.json(testResults);
   } catch (error) {
     console.error("[COMPREHENSIVE TEST ERROR]", error);
     testResults.error = error.message;
@@ -1026,9 +1026,8 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
       criticalIssuesResolved: false,
       message: "❌ Test execution failed: " + error.message
     };
+    res.json(testResults);
   }
-
-  res.json(testResults);
 });
 
 // Discovery page metadata diagnostic endpoint  
