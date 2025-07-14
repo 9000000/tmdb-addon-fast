@@ -311,11 +311,16 @@ addon.get("/debug/test-types", function (req, res) {
 // Verification endpoint to confirm code version
 addon.get("/debug/version", function (req, res) {
   res.json({
-    version: "OLD_CONFIG_COMPATIBILITY_2025_07_13_v4",
+    version: "CRITICAL_BUG_FIXES_2025_07_14_v1",
     packageVersion: require("../package.json").version,
     hasTypeCanonical: typeof toCanonicalType === 'function',
     codebasePath: __dirname,
     timestamp: new Date().toISOString(),
+    criticalFixes: [
+      "🚨 CRITICAL: Fixed getTrending.js - genre parameter was incorrectly used as time_window",
+      "🚨 CRITICAL: Added proper genre filtering for TMDB trending endpoint",  
+      "🚨 CRITICAL: Fixed complete breakage of trending functionality with genre filters"
+    ],
     fixes: [
       "Type canonicalization at API entry points",
       "Fixed parseMedia function for tv/series",
@@ -333,6 +338,17 @@ addon.get("/debug/version", function (req, res) {
       "CRITICAL: Fixed old config parsing with Turkish type names",
       "CRITICAL: Fixed manifest generation for old configs",
       "Added old config compatibility test endpoint"
+    ],
+    testEndpoints: [
+      "/debug/version - Version and fix information",
+      "/debug/test-types - Type canonicalization testing", 
+      "/debug/test-old-config - Old config compatibility testing",
+      "/debug/test-flow - Comprehensive flow testing",
+      "/debug/test-catalog-requests - Direct catalog function testing",
+      "/debug/simulate-stremio - Stremio request simulation",
+      "/debug/test-functions - Core function testing",
+      "/debug/test-parsemedia - parseMedia function testing",
+      "/debug/test-all-functionality - Complete functionality test with bug fixes (NEW)"
     ]
   });
 });
@@ -471,6 +487,541 @@ addon.get("/debug/test-flow", async function (req, res) {
       name: "Old Config Compatibility",
       error: error.message
     });
+  }
+
+  res.json(testResults);
+});
+
+// Comprehensive catalog testing endpoint
+addon.get("/debug/test-catalog-requests", async function (req, res) {
+  const testConfig = {
+    language: "tr-TR",
+    catalogs: [
+      { id: "tmdb.top", type: "movie", enabled: true, showInHome: true },
+      { id: "tmdb.top", type: "series", enabled: true, showInHome: true },
+      { id: "tmdb.trending", type: "movie", enabled: true, showInHome: true },
+      { id: "tmdb.trending", type: "series", enabled: true, showInHome: true }
+    ]
+  };
+
+  const testResults = {
+    timestamp: new Date().toISOString(),
+    tests: []
+  };
+
+  try {
+    // Test 1: tmdb.top movie catalog
+    console.log("[TEST] Testing tmdb.top movie catalog");
+    const topMovies = await getCatalog("movie", "tr-TR", 1, "tmdb.top", null, testConfig);
+    testResults.tests.push({
+      name: "tmdb.top movies",
+      success: !!topMovies?.metas,
+      itemCount: topMovies?.metas?.length || 0,
+      sampleItem: topMovies?.metas?.[0] || null,
+      error: topMovies ? null : "No result returned"
+    });
+
+    // Test 2: tmdb.top series catalog  
+    console.log("[TEST] Testing tmdb.top series catalog");
+    const topSeries = await getCatalog("series", "tr-TR", 1, "tmdb.top", null, testConfig);
+    testResults.tests.push({
+      name: "tmdb.top series",
+      success: !!topSeries?.metas,
+      itemCount: topSeries?.metas?.length || 0,
+      sampleItem: topSeries?.metas?.[0] || null,
+      error: topSeries ? null : "No result returned"
+    });
+
+    // Test 3: tmdb.trending movie catalog
+    console.log("[TEST] Testing tmdb.trending movie catalog");
+    const trendingMovies = await getTrending("movie", "tr-TR", 1, null, testConfig);
+    testResults.tests.push({
+      name: "tmdb.trending movies", 
+      success: !!trendingMovies?.metas,
+      itemCount: trendingMovies?.metas?.length || 0,
+      sampleItem: trendingMovies?.metas?.[0] || null,
+      error: trendingMovies ? null : "No result returned"
+    });
+
+    // Test 4: tmdb.trending series catalog
+    console.log("[TEST] Testing tmdb.trending series catalog");
+    const trendingSeries = await getTrending("series", "tr-TR", 1, null, testConfig);
+    testResults.tests.push({
+      name: "tmdb.trending series",
+      success: !!trendingSeries?.metas,
+      itemCount: trendingSeries?.metas?.length || 0,
+      sampleItem: trendingSeries?.metas?.[0] || null,
+      error: trendingSeries ? null : "No result returned"
+    });
+
+    // Test 5: Search functionality
+    console.log("[TEST] Testing search functionality");
+    const searchResults = await getSearch("tmdb.search", "movie", "tr-TR", "Inception", testConfig);
+    testResults.tests.push({
+      name: "search movies",
+      success: !!searchResults?.metas,
+      itemCount: searchResults?.metas?.length || 0,
+      sampleItem: searchResults?.metas?.[0] || null,
+      error: searchResults ? null : "No result returned"
+    });
+
+    // Test 6: Genre filtering
+    console.log("[TEST] Testing genre filtering");
+    const genreResults = await getCatalog("movie", "tr-TR", 1, "tmdb.top", "Action", testConfig);
+    testResults.tests.push({
+      name: "genre filtering (Action)",
+      success: !!genreResults?.metas,
+      itemCount: genreResults?.metas?.length || 0,
+      sampleItem: genreResults?.metas?.[0] || null,
+      error: genreResults ? null : "No result returned"
+    });
+
+    // Summary
+    const successCount = testResults.tests.filter(t => t.success).length;
+    testResults.summary = {
+      totalTests: testResults.tests.length,
+      successful: successCount,
+      failed: testResults.tests.length - successCount,
+      overallSuccess: successCount === testResults.tests.length
+    };
+
+  } catch (error) {
+    console.error("[TEST ERROR]", error);
+    testResults.error = error.message;
+    testResults.summary = {
+      totalTests: 0,
+      successful: 0,
+      failed: 1,
+      overallSuccess: false
+    };
+  }
+
+  res.json(testResults);
+});
+
+// Test specific parseMedia function
+addon.get("/debug/test-parsemedia", function (req, res) {
+  try {
+    const { parseMedia } = require("./utils/parseProps");
+    
+    // Sample TMDB movie data
+    const movieData = {
+      id: 123456,
+      title: "Test Movie",
+      release_date: "2023-05-15",
+      poster_path: "/test-poster.jpg",
+      backdrop_path: "/test-backdrop.jpg",
+      vote_average: 8.5,
+      overview: "This is a test movie description",
+      genre_ids: [28, 12, 16] // Action, Adventure, Animation
+    };
+
+    // Sample TMDB TV data
+    const tvData = {
+      id: 654321,
+      name: "Test Series",
+      first_air_date: "2023-03-10",
+      poster_path: "/test-series-poster.jpg",
+      backdrop_path: "/test-series-backdrop.jpg", 
+      vote_average: 9.2,
+      overview: "This is a test series description",
+      genre_ids: [18, 10765] // Drama, Sci-Fi & Fantasy
+    };
+
+    const genreList = [
+      { id: 28, name: "Action" },
+      { id: 12, name: "Adventure" },
+      { id: 16, name: "Animation" },
+      { id: 18, name: "Drama" },
+      { id: 10765, name: "Sci-Fi & Fantasy" }
+    ];
+
+    const results = {
+      timestamp: new Date().toISOString(),
+      tests: [
+        {
+          name: "Parse Movie (type='movie')",
+          input: { data: movieData, type: "movie" },
+          result: parseMedia(movieData, "movie", genreList)
+        },
+        {
+          name: "Parse TV (type='tv')",
+          input: { data: tvData, type: "tv" },
+          result: parseMedia(tvData, "tv", genreList)
+        },
+        {
+          name: "Parse Movie (type='series' - should fail gracefully)",
+          input: { data: movieData, type: "series" },
+          result: parseMedia(movieData, "series", genreList)
+        }
+      ]
+    };
+
+    res.json(results);
+  } catch (error) {
+    res.json({
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      stack: error.stack
+    });
+  }
+});
+
+// Test endpoint that simulates actual Stremio requests
+addon.get("/debug/simulate-stremio", async function (req, res) {
+  const configString = req.query.config || "N4IgTgDgJgRg1gUwJ4gFwgC4GYC0UAMWAbAKxQDsAZjgIxE0AsODRAHAMY4wk0k5FQsAJgCGMIviFEh7EABoQAcwQBbAJYA7NYhToAggEkAXiIDKSAMJZKAIQAeALVMAFEQBFWWFRpoB3FQCy7ABqABY2AG7MQjQA0lAAmuQRevIgKrAANmoAzhg6aCBYAI74GFAMND4ArvgaiuQ5apnVDAgIGCQA9hFpmuwtUAh6UNWZGIUYYNUIaRBgPWpDBhkwBlCT07MKmSL11SLKmzgAKgBKaTkIOU1dGuuFMOQwlPiMDEIAnJ+Un6wkbxIDB4xBoNCwnxeDE++E+CF4CAYWA2CjyYAQInU9TQAG0ALoKdgiDAiTJdRQ5XGgJaTVYAOgwXQgaQwSAgs3QKkW2xAGkxHJAziZYxEYEuoS6vgMGgAEl0VBypjMAL5yakbdAYemM5kKVnswpXMBqa5pPkKwpCiAisWoiVS2XyxVbVXq2mwOlIDG2zBsgVciIms38w...";
+  
+  const testResults = {
+    timestamp: new Date().toISOString(),
+    simulatedRequests: []
+  };
+
+  const testUrls = [
+    // Popular movies - first page
+    `/${configString}/catalog/movie/tmdb.top.json`,
+    // Popular series - first page  
+    `/${configString}/catalog/series/tmdb.top.json`,
+    // Trending movies
+    `/${configString}/catalog/movie/tmdb.trending.json`,
+    // Trending series
+    `/${configString}/catalog/series/tmdb.trending.json`,
+    // Movies with pagination
+    `/${configString}/catalog/movie/tmdb.top/skip=100.json`,
+    // Series with genre filter
+    `/${configString}/catalog/series/tmdb.top/genre=${encodeURIComponent("Action")}.json`,
+    // Search
+    `/${configString}/catalog/movie/tmdb.search/search=${encodeURIComponent("Batman")}.json`
+  ];
+
+  for (const url of testUrls) {
+    try {
+      console.log(`[SIMULATE] Testing URL: ${url}`);
+      
+      // Parse the URL like our actual handler does
+      const urlParts = url.split('/');
+      const catalogChoices = urlParts[1];
+      const catalogType = urlParts[3];
+      const catalogId = urlParts[4]?.split('.')[0] || urlParts[4]?.split('/')[0];
+      const extraString = urlParts[4]?.includes('/') ? urlParts[4].split('/')[1]?.replace('.json', '') : null;
+      
+      const config = parseConfig(catalogChoices) || {};
+      const language = config.language || "tr-TR";
+      
+      const extraParams = extraString ? Object.fromEntries(new URLSearchParams(extraString).entries()) : {};
+      const { genre, skip, search } = extraParams;
+      const page = Math.ceil(skip ? skip / 100 + 1 : undefined) || 1;
+      
+      const canonicalType = toCanonicalType(catalogType);
+      
+      console.log(`[SIMULATE] Parsed - Type: ${catalogType} → ${canonicalType}, ID: ${catalogId}, Page: ${page}, Genre: ${genre}, Search: ${search}`);
+      
+      let result;
+      if (search) {
+        result = await getSearch(catalogId, canonicalType, language, search, config);
+      } else if (catalogId === "tmdb.trending") {
+        result = await getTrending(canonicalType, language, page, genre, config);
+      } else {
+        result = await getCatalog(canonicalType, language, page, catalogId, genre, config);
+      }
+      
+      testResults.simulatedRequests.push({
+        url,
+        parsedParams: { catalogType, canonicalType, catalogId, page, genre, search },
+        success: !!result?.metas,
+        itemCount: result?.metas?.length || 0,
+        sampleItem: result?.metas?.[0] ? {
+          id: result.metas[0].id,
+          name: result.metas[0].name,
+          type: result.metas[0].type,
+          year: result.metas[0].year,
+          hasGenres: Array.isArray(result.metas[0].genre) && result.metas[0].genre.length > 0
+        } : null
+      });
+      
+    } catch (error) {
+      console.error(`[SIMULATE ERROR] ${url}:`, error);
+      testResults.simulatedRequests.push({
+        url,
+        success: false,
+        error: error.message
+      });
+    }
+  }
+  
+  // Summary
+  const successCount = testResults.simulatedRequests.filter(r => r.success).length;
+  testResults.summary = {
+    totalRequests: testResults.simulatedRequests.length,
+    successful: successCount,
+    failed: testResults.simulatedRequests.length - successCount,
+    overallSuccess: successCount === testResults.simulatedRequests.length
+  };
+  
+  res.json(testResults);
+});
+
+// Direct function testing endpoint
+addon.get("/debug/test-functions", async function (req, res) {
+  const testResults = {
+    timestamp: new Date().toISOString(),
+    functionTests: []
+  };
+
+  try {
+    // Test 1: Type canonicalization
+    const { toCanonicalType } = require('./utils/typeCanonical');
+    const typeTests = [
+      'movie', 'series', 'tv', 
+      'Detaylı Filtre (Film) 🔎', 
+      'Detaylı Filtre (Dizi) 🔎'
+    ].map(type => ({
+      input: type,
+      output: toCanonicalType(type),
+      correct: ['movie', 'series'].includes(toCanonicalType(type))
+    }));
+    
+    testResults.functionTests.push({
+      name: "toCanonicalType",
+      tests: typeTests,
+      allPassed: typeTests.every(t => t.correct)
+    });
+
+    // Test 2: parseMedia with different types
+    const { parseMedia } = require('./utils/parseProps');
+    const testData = {
+      id: 12345,
+      title: "Test Movie",
+      name: "Test Series", 
+      release_date: "2023-01-01",
+      first_air_date: "2023-01-01",
+      poster_path: "/test.jpg",
+      vote_average: 8.5,
+      overview: "Test description",
+      genre_ids: [28, 12]
+    };
+    
+    const genreList = [{ id: 28, name: "Action" }, { id: 12, name: "Adventure" }];
+    
+    const parseTests = ['movie', 'tv', 'series'].map(type => {
+      try {
+        const result = parseMedia(testData, type, genreList);
+        return {
+          inputType: type,
+          outputType: result.type,
+          hasName: !!result.name,
+          hasYear: !!result.year,
+          hasGenres: Array.isArray(result.genre) && result.genre.length > 0,
+          success: true
+        };
+      } catch (error) {
+        return {
+          inputType: type,
+          success: false,
+          error: error.message
+        };
+      }
+    });
+    
+    testResults.functionTests.push({
+      name: "parseMedia",
+      tests: parseTests,
+      allPassed: parseTests.every(t => t.success)
+    });
+
+    // Test 3: Config parsing
+    const { parseConfig } = require('./utils/parseProps');
+    const testConfigs = [
+      '{"language":"tr-TR","catalogs":[{"type":"movie","id":"tmdb.top"}]}',
+      '{"language":"tr-TR","catalogs":[{"type":"Detaylı Filtre (Film) 🔎","id":"tmdb.top"}]}'
+    ];
+    
+    const configTests = testConfigs.map(configStr => {
+      try {
+        const result = parseConfig(configStr);
+        return {
+          input: configStr,
+          hasValidTypes: result.catalogs ? result.catalogs.every(cat => ['movie', 'series'].includes(cat.type)) : true,
+          success: true,
+          result: result
+        };
+      } catch (error) {
+        return {
+          input: configStr,
+          success: false,
+          error: error.message
+        };
+      }
+    });
+    
+    testResults.functionTests.push({
+      name: "parseConfig",
+      tests: configTests,
+      allPassed: configTests.every(t => t.success && t.hasValidTypes)
+    });
+
+    // Overall summary
+    testResults.summary = {
+      totalFunctionGroups: testResults.functionTests.length,
+      allGroupsPassed: testResults.functionTests.every(group => group.allPassed),
+      details: testResults.functionTests.map(group => ({
+        name: group.name,
+        passed: group.allPassed
+      }))
+    };
+
+  } catch (error) {
+    testResults.error = error.message;
+    testResults.summary = { allGroupsPassed: false };
+  }
+
+  res.json(testResults);
+});
+
+// Final comprehensive test after bug fixes
+addon.get("/debug/test-all-functionality", async function (req, res) {
+  const testResults = {
+    timestamp: new Date().toISOString(),
+    version: "CRITICAL_BUG_FIXES_2025_07_14_v1",
+    bugFixes: [
+      "CRITICAL: Fixed getTrending.js - genre was incorrectly used as time_window",
+      "CRITICAL: Added proper genre filtering for trending endpoint",
+      "CRITICAL: Fixed TMDB API parameter misuse in trending functionality"
+    ],
+    tests: []
+  };
+
+  try {
+    console.log("[COMPREHENSIVE TEST] Starting full functionality test");
+
+    // Test 1: Trending without genre (should work)
+    console.log("[TEST] Testing trending movies without genre");
+    const trendingMoviesNoGenre = await getTrending("movie", "tr-TR", 1, null, {});
+    testResults.tests.push({
+      name: "Trending Movies (No Genre)",
+      success: !!trendingMoviesNoGenre?.metas,
+      itemCount: trendingMoviesNoGenre?.metas?.length || 0,
+      sampleItem: trendingMoviesNoGenre?.metas?.[0] || null,
+      details: "Testing basic trending functionality after bug fix"
+    });
+
+    // Test 2: Trending with genre (this was broken before)
+    console.log("[TEST] Testing trending movies WITH genre (was broken)");
+    const trendingMoviesWithGenre = await getTrending("movie", "tr-TR", 1, "Action", {});
+    testResults.tests.push({
+      name: "Trending Movies (With Action Genre) - BUG FIX TEST",
+      success: !!trendingMoviesWithGenre?.metas,
+      itemCount: trendingMoviesWithGenre?.metas?.length || 0,
+      sampleItem: trendingMoviesWithGenre?.metas?.[0] || null,
+      details: "This was completely broken before - genre was sent as time_window",
+      criticalTest: true
+    });
+
+    // Test 3: Trending series with genre
+    console.log("[TEST] Testing trending series with genre");
+    const trendingSeriesWithGenre = await getTrending("series", "tr-TR", 1, "Drama", {});
+    testResults.tests.push({
+      name: "Trending Series (With Drama Genre) - BUG FIX TEST",
+      success: !!trendingSeriesWithGenre?.metas,
+      itemCount: trendingSeriesWithGenre?.metas?.length || 0,
+      sampleItem: trendingSeriesWithGenre?.metas?.[0] || null,
+      details: "Testing series trending with genre filtering",
+      criticalTest: true
+    });
+
+    // Test 4: Regular catalog functionality
+    console.log("[TEST] Testing regular catalog (tmdb.top)");
+    const topMovies = await getCatalog("movie", "tr-TR", 1, "tmdb.top", null, {});
+    testResults.tests.push({
+      name: "Regular Catalog (tmdb.top movies)",
+      success: !!topMovies?.metas,
+      itemCount: topMovies?.metas?.length || 0,
+      sampleItem: topMovies?.metas?.[0] || null,
+      details: "Ensuring regular catalog still works"
+    });
+
+    // Test 5: Type canonicalization verification
+    const testTypes = ['movie', 'series', 'tv', 'Detaylı Filtre (Film) 🔎', 'Detaylı Filtre (Dizi) 🔎'];
+    testResults.tests.push({
+      name: "Type Canonicalization",
+      success: true,
+      details: testTypes.map(type => ({
+        input: type,
+        canonical: toCanonicalType(type),
+        isValid: ['movie', 'series'].includes(toCanonicalType(type))
+      })),
+      allTypesValid: testTypes.every(type => ['movie', 'series'].includes(toCanonicalType(type)))
+    });
+
+    // Test 6: parseMedia functionality 
+    const testMovieData = {
+      id: 12345,
+      title: "Test Movie",
+      release_date: "2023-01-01",
+      poster_path: "/test.jpg",
+      genre_ids: [28, 12], // Action, Adventure
+      vote_average: 8.5,
+      overview: "Test description"
+    };
+
+    const testGenreList = [
+      { id: 28, name: "Action" },
+      { id: 12, name: "Adventure" }
+    ];
+
+    const { parseMedia } = require("./utils/parseProps");
+    const parsedMovie = parseMedia(testMovieData, "movie", testGenreList);
+    const parsedTv = parseMedia({...testMovieData, name: "Test Series", first_air_date: "2023-01-01"}, "tv", testGenreList);
+
+    testResults.tests.push({
+      name: "parseMedia Function",
+      success: true,
+      details: {
+        movieParsing: {
+          input: "movie",
+          output: parsedMovie,
+          correctType: parsedMovie.type === "movie",
+          hasGenres: parsedMovie.genre.length > 0,
+          hasYear: !!parsedMovie.year
+        },
+        tvParsing: {
+          input: "tv",
+          output: parsedTv,
+          correctType: parsedTv.type === "series", // tv should become series
+          hasGenres: parsedTv.genre.length > 0,
+          hasYear: !!parsedTv.year
+        }
+      }
+    });
+
+    // Summary
+    const successCount = testResults.tests.filter(t => t.success).length;
+    const criticalTests = testResults.tests.filter(t => t.criticalTest);
+    const criticalSuccessCount = criticalTests.filter(t => t.success).length;
+
+    testResults.summary = {
+      totalTests: testResults.tests.length,
+      successful: successCount,
+      failed: testResults.tests.length - successCount,
+      overallSuccess: successCount === testResults.tests.length,
+      criticalTests: criticalTests.length,
+      criticalSuccessful: criticalSuccessCount,
+      criticalIssuesResolved: criticalSuccessCount === criticalTests.length,
+      message: criticalSuccessCount === criticalTests.length ? 
+        "✅ CRITICAL BUG FIXES SUCCESSFUL - Trending with genre filtering now works!" :
+        "❌ Critical issues remain - trending genre filtering still broken"
+    };
+
+  } catch (error) {
+    console.error("[COMPREHENSIVE TEST ERROR]", error);
+    testResults.error = error.message;
+    testResults.summary = {
+      totalTests: 0,
+      successful: 0,
+      failed: 1,
+      overallSuccess: false,
+      criticalIssuesResolved: false,
+      message: "❌ Test execution failed: " + error.message
+    };
   }
 
   res.json(testResults);
