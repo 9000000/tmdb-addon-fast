@@ -2,6 +2,7 @@ require("dotenv").config();
 const { getGenreList } = require("./getGenreList");
 const { getLanguages } = require("./getLanguages");
 const { getGenresFromMDBList } = require("../utils/mdbList");
+const { toCanonicalType } = require("../utils/typeCanonical");
 const packageJson = require("../../package.json");
 const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
@@ -40,6 +41,9 @@ function loadTranslations(language) {
 }
 
 function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCatalogs, showInHome = false) {
+  // Ensure the type is canonical
+  const canonicalType = toCanonicalType(type);
+                       
   const extra = [];
 
   if (catalogDef.extraSupported.includes("genre")) {
@@ -68,8 +72,8 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
 
   return {
     id,
-    type,
-    name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS[type]}`,
+    type: canonicalType,
+    name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS[canonicalType]}`,
     pageSize: 500,
     extra
   };
@@ -108,11 +112,14 @@ function getOptionsForCatalog(catalogDef, type, showInHome, { years, genres_movi
 async function createMDBListCatalog(userCatalog, mdblistKey) {
   const listId = userCatalog.id.split(".")[1];
   const genres = await getGenresFromMDBList(listId, mdblistKey);
+  
+  // Ensure the type is canonical
+  const canonicalType = toCanonicalType(userCatalog.type);
 
   return {
     id: userCatalog.id,
-    type: userCatalog.type,
-    name: TYPE_LABELS[userCatalog.type],
+    type: canonicalType,
+    name: TYPE_LABELS[canonicalType],
     pageSize: 500,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
@@ -163,11 +170,15 @@ async function getManifest(config) {
         return createMDBListCatalog(userCatalog, config.mdblistkey);
       }
       const catalogDef = getCatalogDefinition(userCatalog.id);
-      const catalogOptions = getOptionsForCatalog(catalogDef, userCatalog.type, userCatalog.showInHome, options);
+      
+      // Ensure the type is canonical before processing
+      const canonicalType = toCanonicalType(userCatalog.type);
+      
+      const catalogOptions = getOptionsForCatalog(catalogDef, canonicalType, userCatalog.showInHome, options);
 
       return createCatalog(
         userCatalog.id,
-        userCatalog.type,
+        canonicalType,
         catalogDef,
         catalogOptions,
         tmdbPrefix,

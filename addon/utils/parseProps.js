@@ -197,6 +197,15 @@ function parseConfig(catalogChoices) {
       }
     }
   }
+  
+  // Normalize old configs with Turkish type names
+  if (config.catalogs && Array.isArray(config.catalogs)) {
+    config.catalogs = config.catalogs.map(catalog => ({
+      ...catalog,
+      type: toCanonicalType(catalog.type) // Canonicalize types from old configs
+    }));
+  }
+  
   return config;
 }
 

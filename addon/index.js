@@ -79,8 +79,25 @@ addon.get('/:catalogChoices?/configure', function (req, res) {
 
 addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
     const { catalogChoices } = req.params;
+    console.log(`[DEBUG] Manifest request - catalogChoices: "${catalogChoices}"`);
+    
     const config = parseConfig(catalogChoices) || {};
+    console.log(`[DEBUG] Parsed config:`, JSON.stringify(config, null, 2));
+    
+    if (config.catalogs) {
+      console.log(`[DEBUG] Config catalogs before manifest generation:`, 
+        config.catalogs.map(cat => ({ id: cat.id, type: cat.type, enabled: cat.enabled }))
+      );
+    }
+    
     const manifest = await getManifest(config);
+    
+    console.log(`[DEBUG] Generated manifest with ${manifest.catalogs?.length || 0} catalogs`);
+    if (manifest.catalogs) {
+      console.log(`[DEBUG] Manifest catalog types:`, 
+        manifest.catalogs.map(cat => ({ id: cat.id, type: cat.type, name: cat.name }))
+      );
+    }
     
     const cacheOpts = {
         cacheMaxAge: 12 * 60 * 60,
@@ -294,7 +311,7 @@ addon.get("/debug/test-types", function (req, res) {
 // Verification endpoint to confirm code version
 addon.get("/debug/version", function (req, res) {
   res.json({
-    version: "COMPREHENSIVE_DEEP_FIXES_2025_07_13_v3",
+    version: "OLD_CONFIG_COMPATIBILITY_2025_07_13_v4",
     packageVersion: require("../package.json").version,
     hasTypeCanonical: typeof toCanonicalType === 'function',
     codebasePath: __dirname,
@@ -312,7 +329,10 @@ addon.get("/debug/version", function (req, res) {
       "Enhanced URL parameter decoding for international characters",
       "Added robust error handling in parseMedia function",
       "Improved genre filtering and validation",
-      "Enhanced debug logging throughout catalog pipeline"
+      "Enhanced debug logging throughout catalog pipeline",
+      "CRITICAL: Fixed old config parsing with Turkish type names",
+      "CRITICAL: Fixed manifest generation for old configs",
+      "Added old config compatibility test endpoint"
     ]
   });
 });
@@ -422,6 +442,33 @@ addon.get("/debug/test-flow", async function (req, res) {
   } catch (error) {
     testResults.tests.push({
       name: "Config Parsing",
+      error: error.message
+    });
+  }
+
+  // Test 4: Test endpoint for old config compatibility
+  try {
+    const testOldConfig = '{"language":"tr-TR","catalogs":[{"type":"Detaylı Filtre (Film) 🔎","id":"tmdb.top","enabled":true,"showInHome":true},{"type":"Detaylı Filtre (Dizi) 🔎","id":"tmdb.trending","enabled":true,"showInHome":false}]}';
+    
+    const { parseConfig } = require("./utils/parseProps");
+    const { toCanonicalType } = require('./utils/typeCanonical');
+    
+    const parsedConfig = parseConfig(testOldConfig);
+    
+    testResults.tests.push({
+      name: "Old Config Compatibility",
+      original: testOldConfig,
+      parsed: parsedConfig,
+      typesFixed: parsedConfig.catalogs ? parsedConfig.catalogs.map(cat => ({
+        originalType: cat.type,
+        isCanonical: ['movie', 'series'].includes(cat.type),
+        wouldCanonicalizeAs: toCanonicalType(cat.type)
+      })) : [],
+      success: parsedConfig.catalogs ? parsedConfig.catalogs.every(cat => ['movie', 'series'].includes(cat.type)) : false
+    });
+  } catch (error) {
+    testResults.tests.push({
+      name: "Old Config Compatibility",
       error: error.message
     });
   }
