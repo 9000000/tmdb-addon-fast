@@ -222,35 +222,15 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
 });
 
 addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
-  const { catalogChoices, type, id } = req.params;
-  const canonicalType = toCanonicalType(type); // Canonicalize type at entry point
-  const config = parseConfig(catalogChoices) || {};
-  const tmdbId = id.split(":")[1];
-  const language = config.language || DEFAULT_LANGUAGE;
-  const rpdbkey = config.rpdbkey;
-  const imdbId = req.params.id.split(":")[0];
+  try {
+    const { catalogChoices, type, id } = req.params;
+    const canonicalType = toCanonicalType(type); // Canonicalize type at entry point
+    const config = parseConfig(catalogChoices) || {};
+    const language = config.language || DEFAULT_LANGUAGE;
+    const rpdbkey = config.rpdbkey;
 
-  if (req.params.id.includes("tmdb:")) {
-    const resp = await cacheWrapMeta(`${language}:${canonicalType}:${tmdbId}`, async () => {
-      return await getMeta(canonicalType, language, tmdbId, rpdbkey, {
-        hideEpisodeThumbnails: config.hideEpisodeThumbnails === "true"
-      });
-    });
-    const cacheOpts = {
-      staleRevalidate: 20 * 24 * 60 * 60,
-      staleError: 30 * 24 * 60 * 60,
-    };
-    if (canonicalType == "movie") {
-      cacheOpts.cacheMaxAge = 14 * 24 * 60 * 60;
-    } else if (canonicalType == "series") {
-      const hasEnded = !!((resp.releaseInfo || "").length > 5);
-      cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
-    }
-    respond(res, resp, cacheOpts);
-  }
-  if (req.params.id.includes("tt")) {
-    const tmdbId = await getTmdb(canonicalType, imdbId);
-    if (tmdbId) {
+    if (id.includes("tmdb:")) {
+      const tmdbId = id.split(":")[1];
       const resp = await cacheWrapMeta(`${language}:${canonicalType}:${tmdbId}`, async () => {
         return await getMeta(canonicalType, language, tmdbId, rpdbkey, {
           hideEpisodeThumbnails: config.hideEpisodeThumbnails === "true"
@@ -266,10 +246,37 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
         const hasEnded = !!((resp.releaseInfo || "").length > 5);
         cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
       }
-      respond(res, resp, cacheOpts);
+      return respond(res, resp, cacheOpts);
+    } else if (id.includes("tt")) {
+      const imdbId = id.split(":")[0];
+      const tmdbId = await getTmdb(canonicalType, imdbId);
+      if (tmdbId) {
+        const resp = await cacheWrapMeta(`${language}:${canonicalType}:${tmdbId}`, async () => {
+          return await getMeta(canonicalType, language, tmdbId, rpdbkey, {
+            hideEpisodeThumbnails: config.hideEpisodeThumbnails === "true"
+          });
+        });
+        const cacheOpts = {
+          staleRevalidate: 20 * 24 * 60 * 60,
+          staleError: 30 * 24 * 60 * 60,
+        };
+        if (canonicalType == "movie") {
+          cacheOpts.cacheMaxAge = 14 * 24 * 60 * 60;
+        } else if (canonicalType == "series") {
+          const hasEnded = !!((resp.releaseInfo || "").length > 5);
+          cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
+        }
+        return respond(res, resp, cacheOpts);
+      } else {
+        return respond(res, { meta: {} });
+      }
     } else {
-      respond(res, { meta: {} });
+      console.warn(`[WARNING] Invalid meta ID format: ${id}`);
+      return res.status(404).send("Not Found");
     }
+  } catch (error) {
+    console.error(`[ERROR] Meta request failed for ID "${req.params.id}":`, error);
+    return res.status(500).json({ error: "Failed to retrieve meta information." });
   }
 });
 

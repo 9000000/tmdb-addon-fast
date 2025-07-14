@@ -39,7 +39,10 @@ async function getTrending(type, language, page, genre, config) {
       });
       return { metas };
     })
-    .catch(console.error);
+    .catch(error => {
+      console.error("Error in getTrending:", error);
+      throw error;
+    });
 }
 
 module.exports = { getTrending };

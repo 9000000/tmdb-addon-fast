@@ -72,7 +72,10 @@ async function getCatalog(type, language, page, id, genre, config) {
       const metas = res.results.map(item => parseMedia(item, tmdbType, genreList));
       return { metas };
     })
-    .catch(console.error);
+    .catch(error => {
+      console.error("Error in getCatalog:", error);
+      throw error;
+    });
 }
 
 async function buildParameters(
