@@ -12,7 +12,7 @@ function isNonLatin(text) {
 
 const { toCanonicalType } = require("../utils/typeCanonical");
 
-async function getSearch(id, type, language, query, config) {
+async function getSearch(id, type, language, query, page, config) {
   type = toCanonicalType(type);
   let searchQuery = query;
   if (isNonLatin(searchQuery)) {
@@ -70,6 +70,7 @@ async function getSearch(id, type, language, query, config) {
     const parameters = {
       query: query,
       language,
+      page: page,
       include_adult: config.includeAdult
     };
 
