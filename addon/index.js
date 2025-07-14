@@ -56,14 +56,24 @@ addon.get("/", function (_, res) {
 });
 
 addon.get("/request_token", async function (req, res) {
-  const requestToken = await getRequestToken()
-  respond(res, requestToken);
+  try {
+    const requestToken = await getRequestToken()
+    respond(res, requestToken);
+  } catch (error) {
+    console.error(`[ERROR] Failed to get request token:`, error);
+    res.status(500).json({ error: "Failed to get request token" });
+  }
 });
 
 addon.get("/session_id", async function (req, res) {
-  const requestToken = req.query.request_token
-  const sessionId = await getSessionId(requestToken)
-  respond(res, sessionId);
+  try {
+    const requestToken = req.query.request_token
+    const sessionId = await getSessionId(requestToken)
+    respond(res, sessionId);
+  } catch (error) {
+    console.error(`[ERROR] Failed to get session ID:`, error);
+    res.status(500).json({ error: "Failed to get session ID" });
+  }
 });
 
 addon.use('/configure', express.static(path.join(__dirname, '../dist')));
@@ -78,6 +88,7 @@ addon.get('/:catalogChoices?/configure', function (req, res) {
 });
 
 addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
+  try {
     const { catalogChoices } = req.params;
     console.log(`[DEBUG] Manifest request - catalogChoices: "${catalogChoices}"`);
     
@@ -105,6 +116,10 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
         staleError: 30 * 24 * 60 * 60, 
     };
     respond(res, manifest, cacheOpts);
+  } catch (error) {
+    console.error(`[ERROR] Failed to generate manifest:`, error);
+    res.status(500).json({ error: "Failed to generate manifest" });
+  }
 });
 
 addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
@@ -199,7 +214,9 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
         el.poster = await checkIfExists(rpdbImage) ? rpdbImage : el.poster;
         return el;
       }))
-    } catch (e) { }
+    } catch (e) { 
+      console.warn(`[WARNING] RPDB poster processing failed, using original posters:`, e.message);
+    }
   }
   respond(res, metas, cacheOpts);
 });
@@ -560,7 +577,7 @@ addon.get("/debug/test-catalog-requests", async function (req, res) {
 
     // Test 5: Search functionality
     console.log("[TEST] Testing search functionality");
-    const searchResults = await getSearch("tmdb.search", "movie", "tr-TR", "Inception", testConfig);
+    const searchResults = await getSearch("tmdb.search", "movie", "tr-TR", "Inception", 1, testConfig);
     testResults.tests.push({
       name: "search movies",
       success: !!searchResults?.metas,
@@ -721,7 +738,7 @@ addon.get("/debug/simulate-stremio", async function (req, res) {
       
       let result;
       if (search) {
-        result = await getSearch(catalogId, canonicalType, language, search, config);
+        result = await getSearch(catalogId, canonicalType, language, search, page, config);
       } else if (catalogId === "tmdb.trending") {
         result = await getTrending(canonicalType, language, page, genre, config);
       } else {
