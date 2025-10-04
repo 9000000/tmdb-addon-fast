@@ -65,18 +65,13 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
     extra.push({ name: "skip" });
   }
 
-  const typeName = canonicalType === 'movie' ? 'Movies' : 'Series';
+  const typeName = canonicalType === 'movie' ? 'Movie' : 'Series';
   const catalogName = translatedCatalogs[catalogDef.nameKey] || catalogDef.nameKey;
-
-  // If catalogName already contains "Movies" or "Series", don't append it again.
-  const finalName = (catalogName.includes('Movies') || catalogName.includes('Series'))
-    ? catalogName
-    : `${catalogName} ${typeName}`;
 
   return {
     id,
     type: canonicalType,
-    name: `${tmdbPrefix ? "TMDB - " : ""}${finalName}`,
+    name: `${tmdbPrefix ? "TMDB - " : ""}${catalogName} - ${typeName}`,
     pageSize: 500,
     extra
   };
@@ -118,12 +113,12 @@ async function createMDBListCatalog(userCatalog, mdblistKey) {
   
   // Ensure the type is canonical
   const canonicalType = toCanonicalType(userCatalog.type);
-  const typeName = canonicalType === 'movie' ? 'Movies' : 'Series';
+  const typeName = canonicalType === 'movie' ? 'Movie' : 'Series';
 
   return {
     id: userCatalog.id,
     type: canonicalType,
-    name: `MDBList ${typeName}`,
+    name: `MDBList - ${typeName}`,
     pageSize: 500,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
@@ -196,14 +191,14 @@ async function getManifest(config) {
     const searchCatalogMovie = {
       id: "tmdb.search",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} Movies`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} - Movie`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const searchCatalogSeries = {
       id: "tmdb.search",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} Series`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} - Series`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
@@ -215,14 +210,14 @@ async function getManifest(config) {
     const aiSearchCatalogMovie = {
       id: "tmdb.aisearch",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} Movies`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} - Movie`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const aiSearchCatalogSeries = {
       id: "tmdb.aisearch",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} Series`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} - Series`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
