@@ -65,7 +65,7 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
     extra.push({ name: "skip" });
   }
 
-  const typeName = canonicalType === 'movie' ? 'Movie' : 'Series';
+  const typeName = canonicalType === 'movie';
   const catalogName = translatedCatalogs[catalogDef.nameKey] || catalogDef.nameKey;
 
   return {
@@ -113,7 +113,7 @@ async function createMDBListCatalog(userCatalog, mdblistKey) {
   
   // Ensure the type is canonical
   const canonicalType = toCanonicalType(userCatalog.type);
-  const typeName = canonicalType === 'movie' ? 'Movie' : 'Series';
+  const typeName = canonicalType === 'movie';
 
   return {
     id: userCatalog.id,
@@ -191,14 +191,14 @@ async function getManifest(config) {
     const searchCatalogMovie = {
       id: "tmdb.search",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} - Movie`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const searchCatalogSeries = {
       id: "tmdb.search",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} - Series`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
@@ -210,14 +210,14 @@ async function getManifest(config) {
     const aiSearchCatalogMovie = {
       id: "tmdb.aisearch",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} - Movie`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const aiSearchCatalogSeries = {
       id: "tmdb.aisearch",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} - Series`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
