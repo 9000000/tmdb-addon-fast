@@ -8,11 +8,6 @@ const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const DEFAULT_LANGUAGE = "tr-TR";
 
-// Type labels mapping for display purposes (does not affect API type values)
-const TYPE_LABELS = {
-  movie: "Detaylı Filtre (Film) 🔎",
-  series: "Detaylı Filtre (Dizi) 🔎"
-};
 
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
@@ -70,10 +65,18 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
     extra.push({ name: "skip" });
   }
 
+  const typeName = canonicalType === 'movie' ? 'Movies' : 'Series';
+  const catalogName = translatedCatalogs[catalogDef.nameKey] || catalogDef.nameKey;
+
+  // If catalogName already contains "Movies" or "Series", don't append it again.
+  const finalName = (catalogName.includes('Movies') || catalogName.includes('Series'))
+    ? catalogName
+    : `${catalogName} ${typeName}`;
+
   return {
     id,
     type: canonicalType,
-    name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS[canonicalType]}`,
+    name: `${tmdbPrefix ? "TMDB - " : ""}${finalName}`,
     pageSize: 500,
     extra
   };
@@ -115,11 +118,12 @@ async function createMDBListCatalog(userCatalog, mdblistKey) {
   
   // Ensure the type is canonical
   const canonicalType = toCanonicalType(userCatalog.type);
+  const typeName = canonicalType === 'movie' ? 'Movies' : 'Series';
 
   return {
     id: userCatalog.id,
     type: canonicalType,
-    name: TYPE_LABELS[canonicalType],
+    name: `MDBList ${typeName}`,
     pageSize: 500,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
@@ -145,12 +149,12 @@ async function getManifest(config) {
   const genres_movie = await getGenreList(language, "movie").then(genres => {
     const sortedGenres = genres.map(el => el.name).sort();
     return sortedGenres;
-  });
+  }).catch(() => []);
 
   const genres_series = await getGenreList(language, "series").then(genres => {
     const sortedGenres = genres.map(el => el.name).sort();
     return sortedGenres;
-  });
+  }).catch(() => []);
 
   const languagesArray = await getLanguages();
   const filterLanguages = setOrderLanguage(language, languagesArray);
@@ -188,17 +192,18 @@ async function getManifest(config) {
     }));
 
   if (config.searchEnabled !== "false") {
+    const searchName = translatedCatalogs['search'] || 'Search';
     const searchCatalogMovie = {
       id: "tmdb.search",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.movie}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} Movies`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const searchCatalogSeries = {
       id: "tmdb.search",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.series}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName} Series`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
@@ -206,17 +211,18 @@ async function getManifest(config) {
   }
 
   if (config.geminikey) {
+    const searchName = translatedCatalogs['search'] || 'Search';
     const aiSearchCatalogMovie = {
       id: "tmdb.aisearch",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.movie}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} Movies`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const aiSearchCatalogSeries = {
       id: "tmdb.aisearch",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${TYPE_LABELS.series}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName} Series`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 

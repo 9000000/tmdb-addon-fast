@@ -310,8 +310,6 @@ addon.get("/debug/test-types", function (req, res) {
     'movie',
     'series', 
     'tv',
-    'Detaylı Filtre (Film) 🔎',
-    'Detaylı Filtre (Dizi) 🔎',
     'unknown'
   ];
   
@@ -392,9 +390,7 @@ addon.get("/debug/test-flow", async function (req, res) {
   const typeTests = [
     'movie',
     'series', 
-    'tv',
-    'Detaylı Filtre (Film) 🔎',
-    'Detaylı Filtre (Dizi) 🔎'
+    'tv'
   ];
   
   testResults.tests.push({
@@ -457,11 +453,11 @@ addon.get("/debug/test-flow", async function (req, res) {
     });
   }
 
-  // Test 3: Config parsing with Turkish types
+  // Test 3: Config parsing
   try {
     const testConfigs = [
-      '{"language":"tr-TR","catalogs":[{"type":"Detaylı Filtre (Film) 🔎","id":"tmdb.top"}]}',
-      '{"language":"en-US","catalogs":[{"type":"movie","id":"tmdb.top"}]}'
+      '{"language":"en-US","catalogs":[{"type":"movie","id":"tmdb.top"}]}',
+      '{"language":"tr-TR","catalogs":[{"type":"series","id":"tmdb.top"}]}'
     ];
     
     const configResults = testConfigs.map(configStr => {
@@ -471,7 +467,7 @@ addon.get("/debug/test-flow", async function (req, res) {
           input: configStr,
           parsed: config,
           hasValidTypes: config.catalogs?.every(cat => 
-            ['movie', 'series', 'Detaylı Filtre (Film) 🔎', 'Detaylı Filtre (Dizi) 🔎'].includes(cat.type)
+            ['movie', 'series'].includes(cat.type)
           )
         };
       } catch (e) {
@@ -490,32 +486,6 @@ addon.get("/debug/test-flow", async function (req, res) {
     });
   }
 
-  // Test 4: Test endpoint for old config compatibility
-  try {
-    const testOldConfig = '{"language":"tr-TR","catalogs":[{"type":"Detaylı Filtre (Film) 🔎","id":"tmdb.top","enabled":true,"showInHome":true},{"type":"Detaylı Filtre (Dizi) 🔎","id":"tmdb.trending","enabled":true,"showInHome":false}]}';
-    
-    const { parseConfig } = require("./utils/parseProps");
-    const { toCanonicalType } = require('./utils/typeCanonical');
-    
-    const parsedConfig = parseConfig(testOldConfig);
-    
-    testResults.tests.push({
-      name: "Old Config Compatibility",
-      original: testOldConfig,
-      parsed: parsedConfig,
-      typesFixed: parsedConfig.catalogs ? parsedConfig.catalogs.map(cat => ({
-        originalType: cat.type,
-        isCanonical: ['movie', 'series'].includes(cat.type),
-        wouldCanonicalizeAs: toCanonicalType(cat.type)
-      })) : [],
-      success: parsedConfig.catalogs ? parsedConfig.catalogs.every(cat => ['movie', 'series'].includes(cat.type)) : false
-    });
-  } catch (error) {
-    testResults.tests.push({
-      name: "Old Config Compatibility",
-      error: error.message
-    });
-  }
 
   res.json(testResults);
 });
@@ -799,9 +769,7 @@ addon.get("/debug/test-functions", async function (req, res) {
     // Test 1: Type canonicalization
     const { toCanonicalType } = require('./utils/typeCanonical');
     const typeTests = [
-      'movie', 'series', 'tv', 
-      'Detaylı Filtre (Film) 🔎', 
-      'Detaylı Filtre (Dizi) 🔎'
+      'movie', 'series', 'tv'
     ].map(type => ({
       input: type,
       output: toCanonicalType(type),
@@ -860,7 +828,7 @@ addon.get("/debug/test-functions", async function (req, res) {
     const { parseConfig } = require('./utils/parseProps');
     const testConfigs = [
       '{"language":"tr-TR","catalogs":[{"type":"movie","id":"tmdb.top"}]}',
-      '{"language":"tr-TR","catalogs":[{"type":"Detaylı Filtre (Film) 🔎","id":"tmdb.top"}]}'
+      '{"language":"en-US","catalogs":[{"type":"series","id":"tmdb.top"}]}'
     ];
     
     const configTests = testConfigs.map(configStr => {
@@ -968,7 +936,7 @@ addon.get("/debug/test-all-functionality", async function (req, res) {
     });
 
     // Test 5: Type canonicalization verification
-    const testTypes = ['movie', 'series', 'tv', 'Detaylı Filtre (Film) 🔎', 'Detaylı Filtre (Dizi) 🔎'];
+    const testTypes = ['movie', 'series', 'tv'];
     testResults.tests.push({
       name: "Type Canonicalization",
       success: true,
