@@ -65,13 +65,12 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
     extra.push({ name: "skip" });
   }
 
-  const typeName = canonicalType === 'movie';
   const catalogName = translatedCatalogs[catalogDef.nameKey] || catalogDef.nameKey;
 
   return {
     id,
     type: canonicalType,
-    name: `${tmdbPrefix ? "TMDB - " : ""}${catalogName} - ${typeName}`,
+    name: `${tmdbPrefix ? "TMDB - " : ""}${catalogName}`,
     pageSize: 500,
     extra
   };
@@ -113,12 +112,11 @@ async function createMDBListCatalog(userCatalog, mdblistKey) {
   
   // Ensure the type is canonical
   const canonicalType = toCanonicalType(userCatalog.type);
-  const typeName = canonicalType === 'movie';
 
   return {
     id: userCatalog.id,
     type: canonicalType,
-    name: `MDBList - ${typeName}`,
+    name: `MDBList`,
     pageSize: 500,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
