@@ -2,13 +2,10 @@ require('dotenv').config();
 const FanartTvApi = require("fanart.tv-api");
 const apiKey = process.env.FANART_API;
 const baseUrl = "http://webservice.fanart.tv/v3/";
-let fanart;
-if (apiKey) {
-  fanart = new FanartTvApi({ apiKey, baseUrl });
-}
+const fanart = new FanartTvApi({ apiKey, baseUrl });
 
-const { MovieDb } = require("moviedb-promise");
-const moviedb = new MovieDb(process.env.TMDB_API);
+const { TMDBClient } = require("../utils/tmdbClient");
+const moviedb = new TMDBClient(process.env.TMDB_API);
 
 function pickLogo(logos, language, originalLanguage) {
   const lang = language.split("-")[0];
@@ -26,19 +23,17 @@ async function getLogo(tmdbId, language, originalLanguage) {
     throw new Error(`TMDB ID not available for logo: ${tmdbId}`);
   }
 
-  const fanartPromise = fanart
-    ? fanart
-        .getMovieImages(tmdbId)
-        .then(res => res.hdmovielogo || [])
-        .catch(() => [])
-    : Promise.resolve([]);
+  const [fanartRes, tmdbRes] = await Promise.all([
+    fanart
+      .getMovieImages(tmdbId)
+      .then(res => res.hdmovielogo || [])
+      .catch(() => []),
 
-  const tmdbPromise = moviedb
-    .movieImages({ id: tmdbId })
-    .then(res => res.logos || [])
-    .catch(() => []);
-
-  const [fanartRes, tmdbRes] = await Promise.all([fanartPromise, tmdbPromise]);
+    moviedb
+      .movieImages({ id: tmdbId })
+      .then(res => res.logos || [])
+      .catch(() => [])
+  ]);
 
   const fanartLogos = fanartRes.map(l => ({
     url: l.url,
@@ -65,22 +60,21 @@ async function getTvLogo(tvdb_id, tmdbId, language, originalLanguage) {
     throw new Error(`TVDB ID and TMDB ID not available for logos.`);
   }
 
-  const fanartPromise =
-    fanart && tvdb_id
+  const [fanartRes, tmdbRes] = await Promise.all([
+    tvdb_id
       ? fanart
           .getShowImages(tvdb_id)
           .then(res => res.hdtvlogo || [])
           .catch(() => [])
-      : Promise.resolve([]);
+      : Promise.resolve([]),
 
-  const tmdbPromise = tmdbId
-    ? moviedb
-        .tvImages({ id: tmdbId })
-        .then(res => res.logos || [])
-        .catch(() => [])
-    : Promise.resolve([]);
-
-  const [fanartRes, tmdbRes] = await Promise.all([fanartPromise, tmdbPromise]);
+    tmdbId
+      ? moviedb
+          .tvImages({ id: tmdbId })
+          .then(res => res.logos || [])
+          .catch(() => [])
+      : Promise.resolve([])
+  ]);
 
   const fanartLogos = fanartRes.map(l => ({
     url: l.url,

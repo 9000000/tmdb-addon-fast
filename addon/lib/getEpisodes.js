@@ -1,6 +1,6 @@
 require("dotenv").config();
-const { MovieDb } = require("moviedb-promise");
-const moviedb = new MovieDb(process.env.TMDB_API);
+const { TMDBClient } = require("../utils/tmdbClient");
+const moviedb = new TMDBClient(process.env.TMDB_API);
 const diferentOrder = require("../static/diferentOrder.json");
 const diferentImdbId = require("../static/diferentImdbId.json");
 
@@ -21,13 +21,13 @@ function genSeasonsString(seasons) {
 
 function getThumbnailUrl(stillPath, hideEpisodeThumbnails) {
   if (!stillPath) return null;
-  
+
   const baseImageUrl = `https://image.tmdb.org/t/p/w500${stillPath}`;
-  
+
   if (hideEpisodeThumbnails) {
     return `${process.env.HOST_NAME}/api/image/blur?url=${encodeURIComponent(baseImageUrl)}`;
   }
-  
+
   return baseImageUrl;
 }
 
@@ -37,7 +37,7 @@ async function getEpisodes(language, tmdbId, imdb_id, seasons, config = {}) {
   const difOrder = diferentOrder.find((data) => data.tmdbId === tmdbId);
   const difImdbId = diferentImdbId.find((data) => data.tmdbId === tmdbId);
   imdb_id = !difImdbId ? imdb_id : difImdbId.imdbId;
-  
+
   if (difOrder != undefined) {
     return await moviedb
       .episodeGroup({ language: language, id: difOrder.episodeGroupId })

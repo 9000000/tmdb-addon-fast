@@ -2,12 +2,11 @@ require("dotenv").config();
 const { getGenreList } = require("./getGenreList");
 const { getLanguages } = require("./getLanguages");
 const { getGenresFromMDBList } = require("../utils/mdbList");
-const { toCanonicalType } = require("../utils/typeCanonical");
 const packageJson = require("../../package.json");
 const catalogsTranslations = require("../static/translations.json");
 const CATALOG_TYPES = require("../static/catalog-types.json");
-const DEFAULT_LANGUAGE = "tr-TR";
-
+const { toCanonicalType } = require("../utils/typeCanonical");
+const DEFAULT_LANGUAGE = "en-US";
 
 function generateArrayOfYears(maxYears) {
   const max = new Date().getFullYear();
@@ -36,9 +35,7 @@ function loadTranslations(language) {
 }
 
 function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCatalogs, showInHome = false) {
-  // Ensure the type is canonical
   const canonicalType = toCanonicalType(type);
-                       
   const extra = [];
 
   if (catalogDef.extraSupported.includes("genre")) {
@@ -65,13 +62,11 @@ function createCatalog(id, type, catalogDef, options, tmdbPrefix, translatedCata
     extra.push({ name: "skip" });
   }
 
-  const catalogName = translatedCatalogs[catalogDef.nameKey] || catalogDef.nameKey;
-
   return {
     id,
     type: canonicalType,
-    name: `${tmdbPrefix ? "TMDB - " : ""}${catalogName}`,
-    pageSize: 500,
+    name: `${tmdbPrefix ? "TMDB - " : ""}${translatedCatalogs[catalogDef.nameKey]}`,
+    pageSize: 20,
     extra
   };
 }
@@ -89,6 +84,7 @@ function getCatalogDefinition(catalogId) {
 }
 
 function getOptionsForCatalog(catalogDef, type, showInHome, { years, genres_movie, genres_series, filterLanguages }) {
+  const canonicalType = toCanonicalType(type);
   if (catalogDef.defaultOptions) return catalogDef.defaultOptions;
 
   const movieGenres = showInHome ? [...genres_movie] : ["Top", ...genres_movie];
@@ -100,24 +96,22 @@ function getOptionsForCatalog(catalogDef, type, showInHome, { years, genres_movi
     case 'language':
       return filterLanguages;
     case 'popular':
-      return type === 'movie' ? movieGenres : seriesGenres;
+      return canonicalType === 'movie' ? movieGenres : seriesGenres;
     default:
-      return type === 'movie' ? movieGenres : seriesGenres;
+      return canonicalType === 'movie' ? movieGenres : seriesGenres;
   }
 }
 
 async function createMDBListCatalog(userCatalog, mdblistKey) {
   const listId = userCatalog.id.split(".")[1];
   const genres = await getGenresFromMDBList(listId, mdblistKey);
-  
-  // Ensure the type is canonical
   const canonicalType = toCanonicalType(userCatalog.type);
 
   return {
     id: userCatalog.id,
     type: canonicalType,
-    name: `MDBList`,
-    pageSize: 500,
+    name: userCatalog.name,
+    pageSize: 20,
     extra: [
       { name: "genre", options: genres, isRequired: userCatalog.showInHome ? false : true },
       { name: "skip" },
@@ -129,6 +123,7 @@ async function getManifest(config) {
   const language = config.language || DEFAULT_LANGUAGE;
   const tmdbPrefix = config.tmdbPrefix === "true";
   const provideImdbId = config.provideImdbId === "true";
+  const returnImdbId = config.returnImdbId === "true";
   const sessionId = config.sessionId;
   const userCatalogs = config.catalogs || getDefaultCatalogs();
   const translatedCatalogs = loadTranslations(language);
@@ -142,12 +137,12 @@ async function getManifest(config) {
   const genres_movie = await getGenreList(language, "movie").then(genres => {
     const sortedGenres = genres.map(el => el.name).sort();
     return sortedGenres;
-  }).catch(() => []);
+  });
 
   const genres_series = await getGenreList(language, "series").then(genres => {
     const sortedGenres = genres.map(el => el.name).sort();
     return sortedGenres;
-  }).catch(() => []);
+  });
 
   const languagesArray = await getLanguages();
   const filterLanguages = setOrderLanguage(language, languagesArray);
@@ -167,10 +162,7 @@ async function getManifest(config) {
         return createMDBListCatalog(userCatalog, config.mdblistkey);
       }
       const catalogDef = getCatalogDefinition(userCatalog.id);
-      
-      // Ensure the type is canonical before processing
       const canonicalType = toCanonicalType(userCatalog.type);
-      
       const catalogOptions = getOptionsForCatalog(catalogDef, canonicalType, userCatalog.showInHome, options);
 
       return createCatalog(
@@ -185,18 +177,17 @@ async function getManifest(config) {
     }));
 
   if (config.searchEnabled !== "false") {
-    const searchName = translatedCatalogs['search'] || 'Search';
     const searchCatalogMovie = {
       id: "tmdb.search",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${translatedCatalogs.search}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const searchCatalogSeries = {
       id: "tmdb.search",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}${searchName}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}${translatedCatalogs.search}`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
@@ -204,18 +195,17 @@ async function getManifest(config) {
   }
 
   if (config.geminikey) {
-    const searchName = translatedCatalogs['search'] || 'Search';
     const aiSearchCatalogMovie = {
       id: "tmdb.aisearch",
       type: "movie",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI Search`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
     const aiSearchCatalogSeries = {
       id: "tmdb.aisearch",
       type: "series",
-      name: `${tmdbPrefix ? "TMDB - " : ""}AI ${searchName}`,
+      name: `${tmdbPrefix ? "TMDB - " : ""}AI Search`,
       extra: [{ name: "search", isRequired: true, options: [] }]
     };
 
@@ -226,7 +216,7 @@ async function getManifest(config) {
     `Language: ${language}`,
     `TMDB Account: ${sessionId ? 'Connected' : 'Not Connected'}`,
     `MDBList Integration: ${config.mdblistkey ? 'Connected' : 'Not Connected'}`,
-    `IMDb Integration: ${provideImdbId ? 'Enabled' : 'Disabled'}`,
+    `IMDb Integration: ${provideImdbId || returnImdbId ? "Enabled" : "Disabled"}`,
     `RPDB Integration: ${config.rpdbkey ? 'Enabled' : 'Disabled'}`,
     `Search: ${config.searchEnabled !== "false" ? 'Enabled' : 'Disabled'}`,
     `Active Catalogs: ${catalogs.length}`
@@ -242,7 +232,7 @@ async function getManifest(config) {
     description: "Stremio addon that provides rich metadata for movies and TV shows from TMDB, featuring customizable catalogs, multi-language support, favorites lists, watchlist, ratings, and IMDb integration. Current settings: " + activeConfigs,
     resources: ["catalog", "meta"],
     types: ["movie", "series"],
-    idPrefixes: provideImdbId ? ["tmdb:", "tt"] : ["tmdb:"],
+    idPrefixes: provideImdbId || returnImdbId ? ["tmdb:", "tt"] : ["tmdb:"],
     stremioAddonsConfig,
     behaviorHints: {
       configurable: true,

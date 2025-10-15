@@ -45,9 +45,6 @@ function parseWriter(credits) {
 
 function parseSlug(type, title, imdb_id) {
   const canonicalType = toCanonicalType(type);
-  if (canonicalType !== "movie" && canonicalType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in parseSlug: ${canonicalType}`);
-  }
   return `${canonicalType}/${title.toLowerCase().replace(/ /g, "-")}-${imdb_id ? imdb_id.replace("tt", "") : ""}`;
 }
 
@@ -75,32 +72,36 @@ function parseTrailerStream(videos) {
     });
 }
 
-function parseImdbLink(vote_average, imdb_id) {
+function parseImdbLink(vote_average, imdb_id, ageRating = null, showAgeRatingWithImdbRating = false) {
   return {
-    name: vote_average,
+    name: showAgeRatingWithImdbRating && ageRating ? `${ageRating}\u2003\u2003${vote_average}` : vote_average,
     category: "imdb",
     url: `https://imdb.com/title/${imdb_id}`,
   };
 }
 
-function parseShareLink(title, id, type) {
+function parseShareLink(title, imdb_id, type) {
   const canonicalType = toCanonicalType(type);
-  if (canonicalType !== "movie" && canonicalType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in parseShareLink: ${canonicalType}`);
-  }
   return {
     name: title,
     category: "share",
-    url: `https://web.stremio.com/#/detail/${canonicalType}/${id}`,
+    url: `https://www.strem.io/s/${parseSlug(canonicalType, title, imdb_id)}`,
   };
 }
 
-function parseGenreLink(genres, type, language) {
+function parseImdbParentalGuideLink(imdbId, ageRating) {
+  if (!imdbId || !ageRating) return null;
+
+  return {
+    name: ageRating,
+    category: "Genres",
+    url: `https://www.imdb.com/title/${imdbId}/parentalguide`
+  };
+}
+
+function parseGenreLink(genres, type, language, imdbId = null, ageRating = null, showAgeRatingInGenres = true) {
   const canonicalType = toCanonicalType(type);
-  if (canonicalType !== "movie" && canonicalType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in parseGenreLink: ${canonicalType}`);
-  }
-  return genres.map((genre) => {
+  const genreLinks = genres.map((genre) => {
     return {
       name: genre.name,
       category: "Genres",
@@ -111,10 +112,20 @@ function parseGenreLink(genres, type, language) {
       )}`,
     };
   });
+
+  // Add IMDb parental guide link as first genre if available and enabled
+  if (showAgeRatingInGenres) {
+    const parentalGuideLink = parseImdbParentalGuideLink(imdbId, ageRating);
+    if (parentalGuideLink) {
+      return [parentalGuideLink, ...genreLinks];
+    }
+  }
+
+  return genreLinks;
 }
 
-function parseCreditsLink(credits) {
-  const castData = parseCast(credits, 10);
+function parseCreditsLink(credits, castCount) {
+  const castData = parseCast(credits, castCount);
   const Cast = castData.map((actor) => {
     return {
       name: actor.name,
@@ -163,7 +174,7 @@ function parseRunTime(runtime) {
   if (runtime === 0 || !runtime) {
     return "";
   }
-  
+
   const hours = Math.floor(runtime / 60);
   const minutes = runtime % 60;
 
@@ -180,12 +191,14 @@ function parseCreatedBy(created_by) {
 
 function parseConfig(catalogChoices) {
   let config = {};
-  
+
+  // If catalogChoices is null, undefined or empty, return empty object
   if (!catalogChoices) {
     return config;
   }
-  
+
   try {
+    // Try to decompress with lz-string
     const decoded = decompressFromEncodedURIComponent(catalogChoices);
     config = JSON.parse(decoded);
   } catch (e) {
@@ -197,23 +210,11 @@ function parseConfig(catalogChoices) {
       }
     }
   }
-  
-  // Normalize old configs with Turkish type names
-  if (config.catalogs && Array.isArray(config.catalogs)) {
-    config.catalogs = config.catalogs.map(catalog => ({
-      ...catalog,
-      type: toCanonicalType(catalog.type) // Canonicalize types from old configs
-    }));
-  }
-  
   return config;
 }
 
 async function parsePoster(type, id, poster, language, rpdbkey) {
   const canonicalType = toCanonicalType(type);
-  if (canonicalType !== "movie" && canonicalType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in parsePoster: ${canonicalType}`);
-  }
   const tmdbImage = `https://image.tmdb.org/t/p/w500${poster}`
   if (rpdbkey) {
     const rpdbImage = getRpdbPoster(canonicalType, id, language, rpdbkey)
@@ -223,86 +224,32 @@ async function parsePoster(type, id, poster, language, rpdbkey) {
 }
 
 function parseMedia(el, type, genreList = []) {
-  try {
-    // Handle TMDB API type inconsistency: 'tv' should be treated as 'series'
-    let normalizedType = type;
-    if (type === 'tv') normalizedType = 'series';
-    
-    const canonicalType = toCanonicalType(normalizedType);
-    if (canonicalType !== "movie" && canonicalType !== "series") {
-      console.error(`[ERROR] Unexpected canonical type in parseMedia: ${canonicalType}, original type: ${type}`);
-    }
-    
-    // Safe genre parsing with error handling
-    let genres = [];
-    if (Array.isArray(el.genre_ids) && genreList.length > 0) {
-      genres = el.genre_ids.map(genreId => {
-        const found = genreList.find(g => g.id === genreId);
-        return found ? found.name : null;
-      }).filter(name => name !== null); // Remove null genres, keep valid ones
-      
-      // If no genres were found but genre_ids exist, log for debugging
-      if (genres.length === 0 && el.genre_ids.length > 0) {
-        console.warn(`[WARNING] No genre names found for genre_ids: ${el.genre_ids} in item ${el.id}`);
-      }
-    }
+  const canonicalType = toCanonicalType(type);
+  const genres = Array.isArray(el.genre_ids)
+    ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
+    : [];
 
-    // Ensure year is always a string and properly formatted
-    let year = '';
-    if (canonicalType === 'movie' && el.release_date) {
-      year = el.release_date.substr(0, 4);
-    } else if (canonicalType === 'series' && el.first_air_date) {
-      year = el.first_air_date.substr(0, 4);
-    }
-    
-    // Validate year format for discovery page compatibility
-    if (year && !/^\d{4}$/.test(year)) {
-      console.warn(`[WARNING] Invalid year format: ${year} for item ${el.id}`);
-      year = '';
-    }
-
-    return {
-      id: `tmdb:${el.id}`,
-      name: el.title || el.name || 'Unknown Title',
-      genre: genres, // Array of genre strings, properly filtered
-      poster: el.poster_path ? `https://image.tmdb.org/t/p/w500${el.poster_path}` : null,
-      background: el.backdrop_path ? `https://image.tmdb.org/t/p/original${el.backdrop_path}` : null,
-      posterShape: "regular",
-      imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
-      year: year, // Properly validated year string
-      type: canonicalType,
-      description: el.overview || '',
-    };
-  } catch (error) {
-    console.error(`[ERROR] Failed to parse media item:`, error, 'Item:', el);
-    // Return a minimal valid object
-    return {
-      id: `tmdb:${el.id || 'unknown'}`,
-      name: el.title || el.name || 'Error parsing item',
-      genre: [],
-      poster: null,
-      background: null,
-      posterShape: "regular",
-      imdbRating: 'N/A',
-      year: '',
-      type: toCanonicalType(type),
-      description: 'Error occurred while parsing this item',
-    };
-  }
+  return {
+    id: `tmdb:${el.id}`,
+    name: canonicalType === 'movie' ? el.title : el.name,
+    genre: genres,
+    poster: `https://image.tmdb.org/t/p/w500${el.poster_path}`,
+    background: `https://image.tmdb.org/t/p/original${el.backdrop_path}`,
+    posterShape: "regular",
+    imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
+    year: canonicalType === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+    type: canonicalType,
+    description: el.overview,
+  };
 }
-
 function getRpdbPoster(type, id, language, rpdbkey) {
   const canonicalType = toCanonicalType(type);
-  if (canonicalType !== "movie" && canonicalType !== "series") {
-    console.error(`[ERROR] Unexpected canonical type in getRpdbPoster: ${canonicalType}`);
-  }
-  if (!rpdbkey) return null;
-  const tier = rpdbkey.split("-")[0];
-  const lang = language.split("-")[0];
+  const tier = rpdbkey.split("-")[0]
+  const lang = language.split("-")[0]
   if (tier === "t0" || tier === "t1" || lang === "en") {
-    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${canonicalType}-${id}.jpg?fallback=true`;
+    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${canonicalType}-${id}.jpg?fallback=true`
   } else {
-    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${canonicalType}-${id}.jpg?fallback=true&lang=${lang}`;
+    return `https://api.ratingposterdb.com/${rpdbkey}/tmdb/poster-default/${canonicalType}-${id}.jpg?fallback=true&lang=${lang}`
   }
 }
 
@@ -328,6 +275,7 @@ module.exports = {
   parseTrailerStream,
   parseImdbLink,
   parseShareLink,
+  parseImdbParentalGuideLink,
   parseGenreLink,
   parseCreditsLink,
   parseCoutry,

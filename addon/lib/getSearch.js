@@ -1,19 +1,18 @@
 require("dotenv").config();
-const { MovieDb } = require("moviedb-promise");
-const moviedb = new MovieDb(process.env.TMDB_API);
+const { TMDBClient } = require("../utils/tmdbClient");
+const moviedb = new TMDBClient(process.env.TMDB_API);
 const geminiService = require("../utils/gemini-service");
 const { transliterate } = require("transliteration");
 const { parseMedia } = require("../utils/parseProps");
 const { getGenreList } = require("./getGenreList");
+const { toCanonicalType } = require("../utils/typeCanonical");
 
 function isNonLatin(text) {
   return /[^\u0000-\u007F]/.test(text);
 }
 
-const { toCanonicalType } = require("../utils/typeCanonical");
-
-async function getSearch(id, type, language, query, page, config) {
-  type = toCanonicalType(type);
+async function getSearch(id, type, language, query, config) {
+  const canonicalType = toCanonicalType(type);
   let searchQuery = query;
   if (isNonLatin(searchQuery)) {
     searchQuery = transliterate(searchQuery);
@@ -26,9 +25,9 @@ async function getSearch(id, type, language, query, page, config) {
     try {
       await geminiService.initialize(config.geminikey);
       
-      const titles = await geminiService.searchWithAI(query, type);
+      const titles = await geminiService.searchWithAI(query, canonicalType);
 
-      const genreList = await getGenreList(language, type);
+      const genreList = await getGenreList(language, canonicalType);
       
       const searchPromises = titles.map(async (title) => {
         try {
@@ -38,20 +37,20 @@ async function getSearch(id, type, language, query, page, config) {
             include_adult: config.includeAdult
           };
 
-          if (type === "movie") {
+          if (canonicalType === "movie") {
             const res = await moviedb.searchMovie(parameters);
             if (res.results && res.results.length > 0) {
-              return parseMedia(res.results[0], "movie", genreList);
+              return parseMedia(res.results[0], 'movie', genreList);
             }
           } else {
             const res = await moviedb.searchTv(parameters);
             if (res.results && res.results.length > 0) {
-              return parseMedia(res.results[0], "tv", genreList);
+              return parseMedia(res.results[0], 'tv', genreList);
             }
           }
           return null;
         } catch (error) {
-          console.error(`Erro ao buscar detalhes para título "${title}":`, error);
+          console.error(`Error fetching details for title "${title}":`, error);
           return null;
         }
       });
@@ -60,17 +59,16 @@ async function getSearch(id, type, language, query, page, config) {
       searchResults = results.filter(result => result !== null);
 
     } catch (error) {
-      console.error('Erro ao processar busca com IA:', error);
+      console.error('Error processing AI search:', error);
     }
   }
 
   if (searchResults.length === 0) {
-    const genreList = await getGenreList(language, type);
+    const genreList = await getGenreList(language, canonicalType);
 
     const parameters = {
       query: query,
       language,
-      page: page,
       include_adult: config.includeAdult
     };
 
@@ -78,25 +76,25 @@ async function getSearch(id, type, language, query, page, config) {
       parameters.certification_country = "US";
       switch(config.ageRating) {
         case "G":
-          parameters.certification = type === "movie" ? "G" : "TV-G";
+          parameters.certification = canonicalType === "movie" ? "G" : "TV-G";
           break;
         case "PG":
-          parameters.certification = type === "movie" ? ["G", "PG"].join("|") : ["TV-G", "TV-PG"].join("|");
+          parameters.certification = canonicalType === "movie" ? ["G", "PG"].join("|") : ["TV-G", "TV-PG"].join("|");
           break;
         case "PG-13":
-          parameters.certification = type === "movie" ? ["G", "PG", "PG-13"].join("|") : ["TV-G", "TV-PG", "TV-14"].join("|");
+          parameters.certification = canonicalType === "movie" ? ["G", "PG", "PG-13"].join("|") : ["TV-G", "TV-PG", "TV-14"].join("|");
           break;
         case "R":
-          parameters.certification = type === "movie" ? ["G", "PG", "PG-13", "R"].join("|") : ["TV-G", "TV-PG", "TV-14", "TV-MA"].join("|");
+          parameters.certification = canonicalType === "movie" ? ["G", "PG", "PG-13", "R"].join("|") : ["TV-G", "TV-PG", "TV-14", "TV-MA"].join("|");
           break;
       }
     }
 
-    if (type === "movie") {
+    if (canonicalType === "movie") {
       await moviedb
         .searchMovie(parameters)
         .then((res) => {
-          res.results.map((el) => {searchResults.push(parseMedia(el, "movie", genreList));});
+          res.results.map((el) => {searchResults.push(parseMedia(el, 'movie', genreList));});
         })
         .catch(console.error);
 
@@ -104,7 +102,7 @@ async function getSearch(id, type, language, query, page, config) {
         await moviedb
           .searchMovie({ query: searchQuery, language, include_adult: config.includeAdult })
           .then((res) => {
-            res.results.map((el) => {searchResults.push(parseMedia(el, "movie", genreList));});
+            res.results.map((el) => {searchResults.push(parseMedia(el, 'movie', genreList));});
           })
           .catch(console.error);
       }
@@ -116,13 +114,13 @@ async function getSearch(id, type, language, query, page, config) {
             .then((credits) => {
               credits.cast.map((el) => {
                 if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                  searchResults.push(parseMedia(el, "movie", genreList));
+                  searchResults.push(parseMedia(el, 'movie', genreList));
                 }
               });
               credits.crew.map((el) => {
                 if (el.job === "Director" || el.job === "Writer") {
                   if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                    searchResults.push(parseMedia(el, "movie", genreList));
+                    searchResults.push(parseMedia(el, 'movie', genreList));
                   }
                 }
               });
@@ -133,7 +131,7 @@ async function getSearch(id, type, language, query, page, config) {
       await moviedb
         .searchTv(parameters)
         .then((res) => {
-          res.results.map((el) => {searchResults.push(parseMedia(el, "tv", genreList))});
+          res.results.map((el) => {searchResults.push(parseMedia(el, 'tv', genreList))});
         })
         .catch(console.error);
 
@@ -141,7 +139,7 @@ async function getSearch(id, type, language, query, page, config) {
         await moviedb
           .searchTv({ query: searchQuery, language, include_adult: config.includeAdult })
           .then((res) => {
-            res.results.map((el) => {searchResults.push(parseMedia(el, "tv", genreList))});
+            res.results.map((el) => {searchResults.push(parseMedia(el, 'tv', genreList))});
           })
           .catch(console.error);
       }
@@ -154,14 +152,14 @@ async function getSearch(id, type, language, query, page, config) {
               credits.cast.map((el) => {
                 if (el.episode_count >= 5) {
                   if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                    searchResults.push(parseMedia(el, "tv", genreList));
+                    searchResults.push(parseMedia(el, 'tv', genreList));
                   }
                 }
               });
               credits.crew.map((el) => {
                 if (el.job === "Director" || el.job === "Writer") {
                   if (!searchResults.find((meta) => meta.id === `tmdb:${el.id}`)) {
-                    searchResults.push(parseMedia(el, "tv", genreList));
+                    searchResults.push(parseMedia(el, 'tv', genreList));
                   }
                 }
               });
