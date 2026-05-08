@@ -328,6 +328,26 @@ function parseCollection(collObj) {
   });
 }
 
+async function parseCatalogItem(el, type, language, config = {}) {
+  const { rpdbkey, rpdbMediaTypes, topposterskey, toppostersConfig } = config;
+
+  const poster = await parseMediaImage(type, el.id, el.poster_path, language, rpdbkey, "poster", rpdbMediaTypes, topposterskey, toppostersConfig);
+  const background = await parseMediaImage(type, el.id, el.backdrop_path, language, rpdbkey, "backdrop", rpdbMediaTypes, topposterskey, toppostersConfig);
+
+  return {
+    id: `tmdb:${el.id}`,
+    type: type === 'movie' ? 'movie' : 'series',
+    name: type === 'movie' ? el.title || el.original_title : el.name || el.original_name,
+    poster: poster,
+    posterShape: "regular",
+    background: background,
+    imdbRating: el.vote_average ? el.vote_average.toFixed(1) : undefined,
+    year: type === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+    releaseInfo: type === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+    description: el.overview
+  };
+}
+
 module.exports = {
   parseCertification,
   parseCast,
@@ -353,5 +373,6 @@ module.exports = {
   getRpdbMedia,
   getRpdbPoster,
   parseCollection,
-  getTopPostersUrl
+  getTopPostersUrl,
+  parseCatalogItem
 };

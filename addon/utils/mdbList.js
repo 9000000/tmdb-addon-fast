@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { getMeta } = require("../lib/getMeta");
+const { parseCatalogItem } = require("./parseProps");
 const { rateLimitedMapFiltered } = require("./rateLimiter");
 
 async function fetchMDBListItems(listId, apiKey, language, page) {
@@ -72,25 +73,28 @@ async function parseMDBListItems(items, type, genreFilter, language, config = {}
     })
     .map(item => ({
       id: item.id,
-      type: type
+      type: type,
+      data: item
     }));
 
-  // Use rate-limited fetching to prevent 429 errors
-  const metas = await rateLimitedMapFiltered(
-    filteredItemsByType,
-    async (item) => {
+  // Use parallel parsing — parseCatalogItem when data is available, getMeta as fallback
+  const metas = (await Promise.all(
+    filteredItemsByType.map(async (item) => {
       try {
+        if (item.data && (item.data.poster_path || item.data.poster)) {
+          return await parseCatalogItem(item.data, item.type, language, config);
+        }
+        // Fallback for items without enough data
         const result = await getMeta(item.type, language, item.id, config);
         return result.meta;
       } catch (err) {
         console.error(`Error fetching metadata for ${item.id}:`, err.message);
         return null;
       }
-    },
-    { batchSize: 5, delayMs: 200 }
-  );
+    })
+  )).filter(Boolean);
 
   return { metas, availableGenres };
 }
 
-module.exports = { fetchMDBListItems, getGenresFromMDBList, parseMDBListItems };
+module.exports = { fetchMDBListItems, getGenresFromMDBList, parseMDBListItems };

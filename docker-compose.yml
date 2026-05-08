@@ -1,9 +1,33 @@
 services:
   tmdb-addon:
+    image: tmdb-addon
     build: .
     container_name: tmdb-addon
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
     restart: unless-stopped
+    ports:
+      - "1337:1337"
+    environment:
+      - NODE_ENV=production
+      - PORT=1337
+      - HOST_NAME=http://localhost:1337
+      # Point to host's Redis since it's running separately
+      # Use host.docker.internal for Windows/Mac to access host ports
+      - REDIS_URL=redis://host.docker.internal:6379
+      # - MONGODB_URI=mongodb://mongo:27017/tmdb_addon
+      - METRICS_USER=admin
+      - METRICS_PASSWORD=radius
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # mongo:
+  #   image: mongo:latest
+  #   container_name: tmdb-addon-mongo
+  #   restart: unless-stopped
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongo_data:/data/db
+
+volumes:
+  # mongo_data:
+

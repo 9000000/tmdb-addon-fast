@@ -1,8 +1,9 @@
 require('dotenv').config()
 const { get } = require('../utils/httpClient')
 const { getMeta } = require('./getMeta')
+const { parseCatalogItem } = require('../utils/parseProps')
 
-async function getTraktWatchlist(type, language, page, genre, accessToken) {
+async function getTraktWatchlist(type, language, page, genre, accessToken, config = {}) {
   if (!accessToken) {
     throw new Error('Access token do Trakt não fornecido')
   }
@@ -10,7 +11,6 @@ async function getTraktWatchlist(type, language, page, genre, accessToken) {
   try {
     const typeParam = type === 'movie' ? 'movies' : 'shows'
     const limit = 20
-    const offset = (page - 1) * limit
 
     const response = await get(`https://api.trakt.tv/sync/watchlist/${typeParam}?limit=${limit}&extended=full`, {
       headers: {
@@ -21,26 +21,22 @@ async function getTraktWatchlist(type, language, page, genre, accessToken) {
     })
 
     const items = response.data || []
-    const metas = []
 
-    for (const item of items) {
-      try {
-        let tmdbId = null
+    // Process all items in parallel instead of sequential for-loop
+    const metas = (await Promise.all(
+      items.map(async (item) => {
+        try {
+          const tmdbId = type === 'movie' ? item.movie?.ids?.tmdb : item.show?.ids?.tmdb
+          if (!tmdbId) return null
 
-        if (type === 'movie') {
-          tmdbId = item.movie?.ids?.tmdb
-        } else {
-          tmdbId = item.show?.ids?.tmdb
+          const result = await getMeta(type, language, tmdbId, config)
+          return result.meta
+        } catch (err) {
+          console.error(`Erro ao processar item do Trakt:`, err)
+          return null
         }
-
-        if (tmdbId) {
-          const meta = await getMeta(type, language, tmdbId)
-          metas.push(meta.meta)
-        }
-      } catch (err) {
-        console.error(`Erro ao processar item do Trakt:`, err)
-      }
-    }
+      })
+    )).filter(Boolean)
 
     return { metas }
   } catch (err) {
@@ -49,7 +45,7 @@ async function getTraktWatchlist(type, language, page, genre, accessToken) {
   }
 }
 
-async function getTraktRecommendations(type, language, page, genre, accessToken) {
+async function getTraktRecommendations(type, language, page, genre, accessToken, config = {}) {
   if (!accessToken) {
     throw new Error('Access token do Trakt não fornecido')
   }
@@ -57,7 +53,6 @@ async function getTraktRecommendations(type, language, page, genre, accessToken)
   try {
     const typeParam = type === 'movie' ? 'movies' : 'shows'
     const limit = 20
-    const offset = (page - 1) * limit
 
     const response = await get(`https://api.trakt.tv/recommendations/${typeParam}?limit=${limit}&extended=full`, {
       headers: {
@@ -68,20 +63,22 @@ async function getTraktRecommendations(type, language, page, genre, accessToken)
     })
 
     const items = response.data || []
-    const metas = []
 
-    for (const item of items) {
-      try {
-        const tmdbId = item.ids?.tmdb
+    // Process all items in parallel instead of sequential for-loop
+    const metas = (await Promise.all(
+      items.map(async (item) => {
+        try {
+          const tmdbId = item.ids?.tmdb
+          if (!tmdbId) return null
 
-        if (tmdbId) {
-          const meta = await getMeta(type, language, tmdbId)
-          metas.push(meta.meta)
+          const result = await getMeta(type, language, tmdbId, config)
+          return result.meta
+        } catch (err) {
+          console.error(`Erro ao processar recomendação do Trakt:`, err)
+          return null
         }
-      } catch (err) {
-        console.error(`Erro ao processar recomendação do Trakt:`, err)
-      }
-    }
+      })
+    )).filter(Boolean)
 
     return { metas }
   } catch (err) {
@@ -91,4 +88,3 @@ async function getTraktRecommendations(type, language, page, genre, accessToken)
 }
 
 module.exports = { getTraktWatchlist, getTraktRecommendations }
-

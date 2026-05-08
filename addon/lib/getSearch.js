@@ -4,6 +4,7 @@ const geminiService = require("../utils/gemini-service");
 const groqService = require("../utils/groq-service");
 const { transliterate } = require("transliteration");
 const { getMeta } = require("./getMeta");
+const { parseCatalogItem } = require("../utils/parseProps");
 const { isMovieReleasedInRegion, isMovieReleasedDigitally } = require("./releaseFilter");
 const { rateLimitedMap, rateLimitedMapFiltered } = require("../utils/rateLimiter");
 
@@ -31,7 +32,7 @@ async function getSearch(id, type, language, query, config) {
   }
 
   const isAISearch = id === "tmdb.aisearch";
-  let candidates = []; // Array of { id: number, type: 'movie'|'series' }
+  let candidates = []; // Array of { id: number, type: 'movie'|'series', data: object }
 
   // 1. AI SEARCH
   if (isAISearch) {
@@ -48,12 +49,12 @@ async function getSearch(id, type, language, query, config) {
               if (type === "movie") {
                 const res = await moviedb.searchMovie(parameters);
                 if (res.results && res.results.length > 0) {
-                  return { id: res.results[0].id, type: 'movie' };
+                  return { id: res.results[0].id, type: 'movie', data: res.results[0] };
                 }
               } else {
                 const res = await moviedb.searchTv(parameters);
                 if (res.results && res.results.length > 0) {
-                  return { id: res.results[0].id, type: 'series' };
+                  return { id: res.results[0].id, type: 'series', data: res.results[0] };
                 }
               }
               return null;
@@ -83,12 +84,12 @@ async function getSearch(id, type, language, query, config) {
               if (type === "movie") {
                 const res = await moviedb.searchMovie(parameters);
                 if (res.results && res.results.length > 0) {
-                  return { id: res.results[0].id, type: 'movie' };
+                  return { id: res.results[0].id, type: 'movie', data: res.results[0] };
                 }
               } else {
                 const res = await moviedb.searchTv(parameters);
                 if (res.results && res.results.length > 0) {
-                  return { id: res.results[0].id, type: 'series' };
+                  return { id: res.results[0].id, type: 'series', data: res.results[0] };
                 }
               }
               return null;
@@ -151,7 +152,7 @@ async function getSearch(id, type, language, query, config) {
               return el.release_date <= today;
             });
           }
-          results.forEach((el) => { candidates.push({ id: el.id, type: 'movie' }); });
+          results.forEach((el) => { candidates.push({ id: el.id, type: 'movie', data: el }); });
         })
         .catch(console.error);
 
@@ -160,7 +161,7 @@ async function getSearch(id, type, language, query, config) {
         await moviedb
           .searchMovie({ query: searchQuery, language, include_adult: config.includeAdult })
           .then((res) => {
-            res.results.forEach((el) => { candidates.push({ id: el.id, type: 'movie' }); });
+            res.results.forEach((el) => { candidates.push({ id: el.id, type: 'movie', data: el }); });
           })
           .catch(console.error);
       }
@@ -172,11 +173,11 @@ async function getSearch(id, type, language, query, config) {
             .personMovieCredits({ id: res.results[0].id, language })
             .then((credits) => {
               credits.cast.forEach((el) => {
-                candidates.push({ id: el.id, type: 'movie' });
+                candidates.push({ id: el.id, type: 'movie', data: el });
               });
               credits.crew.forEach((el) => {
                 if (el.job === "Director" || el.job === "Writer") {
-                  candidates.push({ id: el.id, type: 'movie' });
+                  candidates.push({ id: el.id, type: 'movie', data: el });
                 }
               });
             });
@@ -196,7 +197,7 @@ async function getSearch(id, type, language, query, config) {
               return el.first_air_date <= today;
             });
           }
-          results.forEach((el) => { candidates.push({ id: el.id, type: 'series' }); });
+          results.forEach((el) => { candidates.push({ id: el.id, type: 'series', data: el }); });
         })
         .catch(console.error);
 
@@ -205,7 +206,7 @@ async function getSearch(id, type, language, query, config) {
         await moviedb
           .searchTv({ query: searchQuery, language, include_adult: config.includeAdult })
           .then((res) => {
-            res.results.forEach((el) => { candidates.push({ id: el.id, type: 'series' }); });
+            res.results.forEach((el) => { candidates.push({ id: el.id, type: 'series', data: el }); });
           })
           .catch(console.error);
       }
@@ -218,12 +219,12 @@ async function getSearch(id, type, language, query, config) {
             .then((credits) => {
               credits.cast.forEach((el) => {
                 if (el.episode_count >= 5) {
-                  candidates.push({ id: el.id, type: 'series' });
+                  candidates.push({ id: el.id, type: 'series', data: el });
                 }
               });
               credits.crew.forEach((el) => {
                 if (el.job === "Director" || el.job === "Writer") {
-                  candidates.push({ id: el.id, type: 'series' });
+                  candidates.push({ id: el.id, type: 'series', data: el });
                 }
               });
             });
@@ -250,21 +251,26 @@ async function getSearch(id, type, language, query, config) {
   // Let's safe-guard to 40 items max.
   const slicedCandidates = uniqueCandidates.slice(0, 40);
 
-  // 4. FETCH METADATA (using getMeta to ensure IMDb IDs)
-  let searchResults = await rateLimitedMapFiltered(
-    slicedCandidates,
-    async (item) => {
+  // 4. FETCH METADATA — use parseCatalogItem instead of getMeta for massive speed boost
+  let searchResults = (await Promise.all(
+    slicedCandidates.map(async (item) => {
       try {
+        if (item.data) {
+          // Use inline parsing (no extra API calls)
+          const meta = await parseCatalogItem(item.data, item.type, language, config);
+          if (meta) meta.tmdb_id = item.id;
+          return meta;
+        }
+        // Fallback to getMeta if no data available (e.g., from person credits)
         const result = await getMeta(item.type, language, item.id, config);
         if (result.meta) result.meta.tmdb_id = item.id;
         return result.meta;
       } catch (err) {
         console.error(`Error fetching metadata for search result ${item.id}:`, err.message);
-        return null; // rateLimitedMapFiltered filters out nulls
+        return null;
       }
-    },
-    { batchSize: 5, delayMs: 200 }
-  );
+    })
+  )).filter(Boolean);
 
   // 5. POST-FILTERS (Strict Region, Digital Release)
 

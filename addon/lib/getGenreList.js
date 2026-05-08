@@ -37,7 +37,7 @@ async function getGenreList(language, type, config = {}) {
       console.error(`Error fetching ${type} genres:`, error.message);
       return type === "movie" ? FALLBACK_MOVIE_GENRES : FALLBACK_TV_GENRES;
     }
-  }, { ttl: 30 * 24 * 60 * 60 }); // Cache for 30 days
+  }, 30 * 24 * 60 * 60); // Cache for 30 days
 }
 
 module.exports = { getGenreList };

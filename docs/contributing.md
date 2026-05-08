@@ -1,132 +1,46 @@
-# Contributing Guide
+# Contributing to Antigravity IDE
 
-Thank you for your interest in contributing to the TMDB Addon! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing! We welcome contributions from everyone.
 
-## Code of Conduct
+## 🤝 Code of Conduct
+By participating in this project, you agree to abide by our Code of Conduct. Please be respectful and inclusive.
 
-By participating in this project, you agree to abide by our Code of Conduct. Please read it before contributing.
+## 🚀 How to Contribute
 
-## How Can I Contribute?
+### 1. Reporting Bugs
+-   Check [Troubleshooting Guide](./TROUBLESHOOTING.md) first.
+-   Open an issue with a clear title and description.
+-   Include reproduction steps and environment details.
 
-### Reporting Bugs
+### 2. Suggesting Enhancements
+-   Open an issue tagged `enhancement`.
+-   Explain *why* this feature would be useful.
 
-1. Check if the bug has already been reported in the Issues section
-2. If not, create a new issue using the bug report template
-3. Include:
-   - Clear title and description
-   - Steps to reproduce
-   - Expected behavior
-   - Actual behavior
-   - Screenshots if applicable
-   - Your environment details
+### 3. Pull Requests (PR)
+-   **Fork** the repo and create your branch from `develop`.
+-   **Structure**: `feat/your-feature` or `fix/your-bug`.
+-   **Commit Messages**: We use [Conventional Commits](https://www.conventionalcommits.org/).
+    -   `feat: add new workflow`
+    -   `fix: resolve npm install error`
+    -   `docs: update readme`
+-   **Tests**: Ensure all tests pass (`npm test`).
+-   **Lint**: Run `npm run lint` before committing.
 
-### Suggesting Enhancements
+## 🛠️ Development Setup
 
-1. Check if the enhancement has been suggested in the Issues section
-2. If not, create a new issue using the feature request template
-3. Include:
-   - Clear title and description
-   - Use case
-   - Proposed solution
-   - Alternative solutions considered
+1.  Clone your fork:
+    ```bash
+    git clone https://github.com/your-username/google-antigravity.git
+    cd google-antigravity
+    ```
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+3.  Link globally for testing:
+    ```bash
+    npm link
+    ```
 
-### Pull Requests
-
-1. Fork the repository
-2. Create a new branch:
-   ```bash
-   git checkout -b feature/your-feature
-   ```
-3. Make your changes
-4. Run tests and linting:
-   ```bash
-   npm test
-   npm run lint
-   ```
-5. Commit your changes:
-   ```bash
-   git commit -m "feat: add some feature"
-   ```
-   We use [Conventional Commits](https://www.conventionalcommits.org/) specification.
-
-6. Push to your fork:
-   ```bash
-   git push origin feature/your-feature
-   ```
-7. Open a Pull Request
-
-## Commit Message Guidelines
-
-We follow the Conventional Commits specification:
-
-- `feat:` - A new feature
-- `fix:` - A bug fix
-- `docs:` - Documentation changes
-- `style:` - Code style changes (formatting, etc)
-- `refactor:` - Code changes that neither fix bugs nor add features
-- `perf:` - Performance improvements
-- `test:` - Adding or modifying tests
-- `chore:` - Changes to build process or auxiliary tools
-
-Example:
-```
-feat: add support for custom catalogs
-
-- Add catalog interface
-- Implement catalog registration
-- Add documentation
-```
-
-## Development Process
-
-1. **Pick an Issue**:
-   - Look for issues labeled `good first issue` or `help wanted`
-   - Comment on the issue to let others know you're working on it
-
-2. **Development**:
-   - Follow the [Development Guide](development.md)
-   - Keep changes focused and atomic
-   - Add tests for new features
-
-3. **Code Review**:
-   - All submissions require review
-   - Be open to feedback and suggestions
-   - Respond to comments promptly
-
-## Style Guide
-
-- Follow the existing code style
-- Use TypeScript for type safety
-- Write meaningful comments
-- Keep functions small and focused
-- Use descriptive variable names
-
-## Testing
-
-- Write tests for new features
-- Ensure all tests pass before submitting
-- Include both unit and integration tests
-- Test edge cases
-
-## Documentation
-
-- Update documentation for new features
-- Include JSDoc comments for functions
-- Update README if necessary
-- Add examples when helpful
-
-## Need Help?
-
-- Check the [Development Guide](development.md)
-- Look through closed issues for similar problems
-- Ask questions in the discussions section
-- Join our community chat
-
-## Recognition
-
-Contributors will be recognized in:
-- The project's README
-- Release notes
-- Our contributors page
-
-Thank you for contributing to TMDB Addon! 
+## 📜 License
+By contributing, you agree that your contributions will be licensed under its MIT License.

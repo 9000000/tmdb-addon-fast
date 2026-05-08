@@ -232,7 +232,7 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
   try {
     const { catalogChoices } = req.params;
     const config = parseConfig(catalogChoices) || {};
-    const manifest = await getManifest(config);
+    const manifest = await getManifest(config, req);
 
     const cacheOpts = {
       cacheMaxAge: 12 * 60 * 60,
@@ -330,9 +330,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
     }
 
     try {
-      const resp = await cacheWrapMeta(`${language}:${type}:${tmdbId}`, async () => {
-        return await getMeta(type, language, tmdbId, config);
-      });
+      const resp = await getMeta(type, language, tmdbId, config);
       const cacheOpts = {
         staleRevalidate: 20 * 24 * 60 * 60,
         staleError: 30 * 24 * 60 * 60,
@@ -455,7 +453,7 @@ addon.post("/api/stats/track-user", async function (req, res) {
   try {
     await trackUser(req);
     const count = await getUserCount();
-    
+
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Content-Type", "application/json");
@@ -469,12 +467,12 @@ addon.post("/api/stats/track-user", async function (req, res) {
 addon.get("/api/stats/users", async function (req, res) {
   try {
     const count = await getAggregatedUserCount();
-    
+
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Cache-Control", "public, max-age=300"); // Cache por 5 minutos
-    
+
     res.json({ count });
   } catch (error) {
     console.error('Error getting user count:', error);
@@ -489,15 +487,15 @@ addon.post("/api/stats/report-users", async function (req, res) {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ error: 'Request body is required' });
     }
-    
+
     const { count, instanceId } = req.body;
-    
+
     if (!count || !instanceId) {
       return res.status(400).json({ error: 'count and instanceId are required' });
     }
-    
+
     await trackExternalUsers(parseInt(count), instanceId);
-    
+
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader("Content-Type", "application/json");

@@ -47,7 +47,7 @@ function createAxiosInstance(url) {
   const config = {
     timeout: 30000,
     headers: {
-      'User-Agent': 'TMDB-Addon/3.1.7'
+      'User-Agent': 'TMDB-Addon/5.0.1'
     }
   };
 
