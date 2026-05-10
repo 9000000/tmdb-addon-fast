@@ -37,8 +37,11 @@ const staticOptions = {
   }
 };
 
-addon.use(express.static(path.join(__dirname, '../public'), staticOptions));
-addon.use(express.static(path.join(__dirname, '../dist'), staticOptions));
+// Dynamic paths to prevent Vercel bundler from scanning static assets as lambda functions
+const distFolderName = 'dist';
+const publicFolderName = 'public';
+addon.use(express.static(path.join(__dirname, '..', publicFolderName), staticOptions));
+addon.use(express.static(path.join(__dirname, '..', distFolderName), staticOptions));
 
 const getCacheHeaders = function (opts) {
   opts = opts || {};
