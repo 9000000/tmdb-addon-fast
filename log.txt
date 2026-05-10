@@ -1,0 +1,6 @@
+09:44:11.912 
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+09:44:11.912 
+✓ built in 5.13s
+09:44:18.040 
+Warning: Node.js functions are compiled from ESM to CommonJS. If this is not intended, add "type": "module" to your package.json file.

@@ -1,6 +1,4 @@
-const urlExists = require("url-exists");
 const { decompressFromEncodedURIComponent } = require('lz-string');
-const { get } = require("http");
 
 function parseCertification(release_dates, language) {
   return release_dates.results.filter(
