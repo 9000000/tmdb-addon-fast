@@ -70,6 +70,9 @@
     "tailwind-merge": "^2.5.2",
     "transliteration": "^2.3.5"
   },
+  "overrides": {
+    "uuid": "^11.0.0"
+  },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",
