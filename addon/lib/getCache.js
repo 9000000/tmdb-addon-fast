@@ -104,10 +104,21 @@ function initiateCache() {
   if (redisClient) {
     console.log('[Cache] Creating Redis Custom Store for cache-manager v7...');
     const redisStore = {
-      async get(key) {
+      async get(key, options) {
         try {
           const val = await redisClient.get(key);
-          return val ? JSON.parse(val) : undefined;
+          if (!val) return undefined;
+
+          const parsed = JSON.parse(val);
+          // Check if value is wrapped with { value, expires } for cache-manager wrap compat
+          const hasWrap = parsed && typeof parsed === 'object' && 'value' in parsed && 'expires' in parsed;
+          const expires = hasWrap ? parsed.expires : (Date.now() + META_TTL);
+          const value = hasWrap ? parsed.value : parsed;
+
+          if (options?.raw) {
+            return { value, expires };
+          }
+          return value;
         } catch (err) {
           console.error('[Redis Store] Error getting key:', key, err.message);
           return undefined;
@@ -115,18 +126,27 @@ function initiateCache() {
       },
       async set(key, value, ttl) {
         try {
-          const valStr = JSON.stringify(value);
-          const msTTL = ttl !== undefined ? ttl : META_TTL;
+          // Normalize TTL from wrap (ms as number) or direct call (object like { ttl: seconds })
+          let msTTL = META_TTL;
+          if (typeof ttl === 'number') {
+            msTTL = ttl;
+          } else if (ttl && typeof ttl === 'object' && typeof ttl.ttl === 'number') {
+            msTTL = ttl.ttl * 1000;
+          }
+
+          const expires = Date.now() + msTTL;
+          const payload = JSON.stringify({ value, expires });
+
           if (msTTL > 0) {
-            await redisClient.set(key, valStr, 'PX', msTTL);
+            await redisClient.set(key, payload, 'PX', msTTL);
           } else {
-            await redisClient.set(key, valStr);
+            await redisClient.set(key, payload);
           }
         } catch (err) {
           console.error('[Redis Store] Error setting key:', key, err.message);
         }
       },
-      async del(key) {
+      async delete(key) {
         try {
           await redisClient.del(key);
         } catch (err) {
@@ -135,7 +155,7 @@ function initiateCache() {
       }
     };
 
-    return createCache(redisStore);
+    return createCache({ stores: [redisStore] });
   }
 
   console.log('[Cache] Using in-memory cache (no REDIS_URL configured)');
