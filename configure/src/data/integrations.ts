@@ -21,7 +21,7 @@ export const integrations: Integration[] = [
   {
     id: "topposters",
     name: "Top Posters",
-    icon: "https://api.top-streaming.stream/favicon.ico",
+    icon: "https://api.top-streaming.stream/static/favicon.svg",
     description: "High-quality posters with rating and trend badges. Takes priority over RPDB for posters.",
   },
   {

@@ -5,7 +5,7 @@ const { parseCatalogItem } = require('../utils/parseProps')
 
 async function getTraktWatchlist(type, language, page, genre, accessToken, config = {}) {
   if (!accessToken) {
-    throw new Error('Access token do Trakt não fornecido')
+    throw new Error('Trakt access token was not provided')
   }
 
   try {
@@ -47,7 +47,7 @@ async function getTraktWatchlist(type, language, page, genre, accessToken, confi
 
 async function getTraktRecommendations(type, language, page, genre, accessToken, config = {}) {
   if (!accessToken) {
-    throw new Error('Access token do Trakt não fornecido')
+    throw new Error('Trakt access token was not provided')
   }
 
   try {

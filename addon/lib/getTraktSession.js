@@ -19,13 +19,13 @@ function getRedirectUri(requestHost = null) {
   }
   
   // Fallback para variável de ambiente ou padrão
-  const baseUrl = process.env.HOST_NAME || 'http://localhost:3000'
+  const baseUrl = process.env.HOST_NAME || 'http://localhost:1337'
   return process.env.TRAKT_REDIRECT_URI || `${baseUrl}/configure/oauth-callback`
 }
 
 async function getTraktAuthUrl(requestHost = null) {
   if (!TRAKT_CLIENT_ID) {
-    throw new Error('TRAKT_CLIENT_ID não configurado')
+    throw new Error('TRAKT_CLIENT_ID is not configured')
   }
 
   const redirectUri = getRedirectUri(requestHost)
@@ -38,7 +38,7 @@ async function getTraktAuthUrl(requestHost = null) {
 
 async function getTraktAccessToken(code, redirectUri = null) {
   if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
-    throw new Error('TRAKT_CLIENT_ID ou TRAKT_CLIENT_SECRET não configurados')
+    throw new Error('TRAKT_CLIENT_ID or TRAKT_CLIENT_SECRET is not configured')
   }
 
   // Usa o redirect_uri fornecido ou o padrão
@@ -60,13 +60,13 @@ async function getTraktAccessToken(code, redirectUri = null) {
     return response.data || response
   } catch (err) {
     console.error('Erro ao obter access token do Trakt:', err)
-    return { success: false, error: err.message || 'Erro ao autenticar com Trakt' }
+    return { success: false, error: err.message || 'Failed to authenticate with Trakt' }
   }
 }
 
 async function refreshTraktAccessToken(refreshToken, redirectUri = null) {
   if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
-    throw new Error('TRAKT_CLIENT_ID ou TRAKT_CLIENT_SECRET não configurados')
+    throw new Error('TRAKT_CLIENT_ID or TRAKT_CLIENT_SECRET is not configured')
   }
 
   // Usa o redirect_uri fornecido ou o padrão
@@ -88,9 +88,8 @@ async function refreshTraktAccessToken(refreshToken, redirectUri = null) {
     return response.data || response
   } catch (err) {
     console.error('Erro ao renovar access token do Trakt:', err)
-    return { success: false, error: err.message || 'Erro ao renovar token do Trakt' }
+    return { success: false, error: err.message || 'Failed to refresh Trakt token' }
   }
 }
 
 module.exports = { getTraktAuthUrl, getTraktAccessToken, refreshTraktAccessToken }
-
