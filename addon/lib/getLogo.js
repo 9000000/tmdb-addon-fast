@@ -2,7 +2,14 @@ require('dotenv').config();
 const FanartTvApi = require("fanart.tv-api");
 const apiKey = process.env.FANART_API;
 const baseUrl = "http://webservice.fanart.tv/v3/";
-const fanart = new FanartTvApi({ apiKey, baseUrl });
+let fanart = null;
+if (apiKey) {
+  try {
+    fanart = new FanartTvApi({ apiKey, baseUrl });
+  } catch (err) {
+    console.error("Failed to initialize Fanart Tv API:", err.message);
+  }
+}
 
 const { getTmdbClient } = require("../utils/getTmdbClient");
 const TARGET_ASPECT_RATIO = 4.0;
@@ -76,9 +83,11 @@ async function getLogo(tmdbId, language, originalLanguage, config = {}) {
     const moviedb = getTmdbClient(config);
     const [fanartRes, tmdbRes] = await Promise.all([
       fanart
-        .getMovieImages(tmdbId)
-        .then(res => res.hdmovielogo || [])
-        .catch(() => []),
+        ? fanart
+            .getMovieImages(tmdbId)
+            .then(res => res.hdmovielogo || [])
+            .catch(() => [])
+        : Promise.resolve([]),
 
       moviedb
         .movieImages({ id: tmdbId })
@@ -122,7 +131,7 @@ async function getTvLogo(tvdb_id, tmdbId, language, originalLanguage, config = {
 
     const moviedb = getTmdbClient(config);
     const [fanartRes, tmdbRes] = await Promise.all([
-      tvdb_id
+      (fanart && tvdb_id)
         ? fanart
           .getShowImages(tvdb_id)
           .then(res => res.hdtvlogo || [])

@@ -216,22 +216,12 @@ addon.use('/configure', (req, res, next) => {
   next();
 });
 
-// Rota para /configure (sem sub-rotas)
-addon.get('/configure', function (req, res) {
+// Route Handlers
+const handleConfigure = function (req, res) {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
-});
+};
 
-// Rota catch-all para servir o React app em todas as rotas /configure/*
-// Usa * para capturar qualquer coisa após /configure/
-addon.get(/^\/configure\/.+$/, function (req, res) {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
-});
-
-addon.get('/:catalogChoices?/configure', function (req, res) {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
-});
-
-addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
+const handleManifest = async function (req, res) {
   try {
     const { catalogChoices } = req.params;
     const config = parseConfig(catalogChoices) || {};
@@ -247,9 +237,9 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
     console.error('Error generating manifest:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
-});
+};
 
-addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
+const handleCatalog = async function (req, res) {
   const { catalogChoices, type, id, extra } = req.params;
   const config = parseConfig(catalogChoices) || {};
   const language = config.language || DEFAULT_LANGUAGE;
@@ -297,7 +287,6 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
       }
     }
   } catch (e) {
-    // Handle missing or invalid TMDB API key error
     if (e.message === "TMDB_API_KEY_MISSING" || e.message === "TMDB_API_KEY_INVALID") {
       res.status(e.statusCode || 401).json({
         error: e.userMessage || "TMDB API Key is required or invalid",
@@ -314,19 +303,18 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
     staleError: 14 * 24 * 60 * 60,
   };
   respond(res, metas, cacheOpts);
-});
+};
 
-addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
+const handleMeta = async function (req, res) {
   const { catalogChoices, type, id } = req.params;
   const config = parseConfig(catalogChoices) || {};
   const tmdbId = id.split(":")[1];
   const language = config.language || DEFAULT_LANGUAGE;
   const imdbId = req.params.id.split(":")[0];
-  delete config.catalogs
-  delete config.streaming
+  delete config.catalogs;
+  delete config.streaming;
 
   if (id.includes("tmdb:")) {
-    // Validate that tmdbId is numeric
     if (!/^\d+$/.test(tmdbId)) {
       res.status(404).json({ error: "Invalid TMDB ID" });
       return;
@@ -346,7 +334,6 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
       }
       respond(res, resp, cacheOpts);
     } catch (e) {
-      // Handle missing or invalid TMDB API key error
       if (e.message === "TMDB_API_KEY_MISSING" || e.message === "TMDB_API_KEY_INVALID") {
         res.status(e.statusCode || 401).json({
           error: e.userMessage || "TMDB API Key is required or invalid",
@@ -384,7 +371,6 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
         respond(res, { meta: {} });
       }
     } catch (e) {
-      // Handle missing or invalid TMDB API key error
       if (e.message === "TMDB_API_KEY_MISSING" || e.message === "TMDB_API_KEY_INVALID") {
         res.status(e.statusCode || 401).json({
           error: e.userMessage || "TMDB API Key is required or invalid",
@@ -404,7 +390,27 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
 
   res.status(400).json({ error: "Invalid ID format. Expected tmdb:<id> or tt<id>" });
   return;
-});
+};
+
+// Đăng ký các Route rõ ràng và tương thích
+// 1. Configure Routes
+addon.get('/configure', handleConfigure);
+addon.get('/:catalogChoices/configure', handleConfigure);
+addon.get(/^\/configure\/.+$/, handleConfigure);
+
+// 2. Manifest Routes
+addon.get('/manifest.json', handleManifest);
+addon.get('/:catalogChoices/manifest.json', handleManifest);
+
+// 3. Catalog Routes
+addon.get('/catalog/:type/:id.json', handleCatalog);
+addon.get('/catalog/:type/:id/:extra.json', handleCatalog);
+addon.get('/:catalogChoices/catalog/:type/:id.json', handleCatalog);
+addon.get('/:catalogChoices/catalog/:type/:id/:extra.json', handleCatalog);
+
+// 4. Meta Routes
+addon.get('/meta/:type/:id.json', handleMeta);
+addon.get('/:catalogChoices/meta/:type/:id.json', handleMeta);
 
 addon.get("/api/proxy/status", async function (req, res) {
   try {
