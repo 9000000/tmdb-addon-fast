@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instala as dependências
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copia o restante do código fonte
 COPY . .
@@ -24,7 +24,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instala apenas dependências de produção
-RUN npm install --production
+RUN npm install --production --legacy-peer-deps
 
 # Copia os arquivos do servidor
 COPY --from=builder /app/addon ./addon
