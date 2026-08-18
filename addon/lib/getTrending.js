@@ -1,6 +1,5 @@
 require("dotenv").config();
 const { getTmdbClient } = require("../utils/getTmdbClient");
-const { getMeta } = require("./getMeta");
 const { isMovieReleasedInRegion, isMovieReleasedDigitally } = require("./releaseFilter");
 const { rateLimitedMapFiltered } = require("../utils/rateLimiter");
 const { cacheWrapCatalog } = require("./getCache");

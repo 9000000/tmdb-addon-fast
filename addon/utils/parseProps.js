@@ -210,9 +210,9 @@ function parseConfig(catalogChoices) {
 }
 
 
-async function parseMediaImage(type, id, imagePath, language, rpdbkey, mediaType = "poster", rpdbMediaTypes = null, topposterskey = null, toppostersConfig = null) {
+async function parseMediaImage(type, id, imagePath, language, rpdbkey, mediaType = "poster", rpdbMediaTypes = null, topposterskey = null, toppostersConfig = null, tmdbPosterSize = "w500") {
   // Determina o tamanho da imagem do TMDB baseado no tipo de mídia
-  const tmdbSize = mediaType === "backdrop" || mediaType === "logo" ? "original" : "w500";
+  const tmdbSize = mediaType === "backdrop" || mediaType === "logo" ? "original" : tmdbPosterSize;
   const tmdbImage = `https://image.tmdb.org/t/p/${tmdbSize}${imagePath}`;
 
   // Verify TopPosters
@@ -257,16 +257,18 @@ function parseMedia(el, type, genreList = []) {
   const genres = Array.isArray(el.genre_ids)
     ? el.genre_ids.map(genre => genreList.find((x) => x.id === genre)?.name || 'Unknown')
     : [];
+  const year = type === 'movie' ? el.release_date?.substr(0, 4) : el.first_air_date?.substr(0, 4);
 
   return {
     id: `tmdb:${el.id}`,
     name: type === 'movie' ? el.title : el.name,
     genre: genres,
-    poster: `https://image.tmdb.org/t/p/w500${el.poster_path}`,
-    background: `https://image.tmdb.org/t/p/original${el.backdrop_path}`,
+    poster: `https://image.tmdb.org/t/p/w342${el.poster_path}`,
+    background: `https://image.tmdb.org/t/p/w1280${el.backdrop_path}`,
     posterShape: "regular",
     imdbRating: el.vote_average ? el.vote_average.toFixed(1) : 'N/A',
-    year: type === 'movie' ? (el.release_date ? el.release_date.substr(0, 4) : "") : (el.first_air_date ? el.first_air_date.substr(0, 4) : ""),
+    year: year || "",
+    releaseInfo: year || "",
     type: type === 'movie' ? type : 'series',
     description: el.overview,
   };
