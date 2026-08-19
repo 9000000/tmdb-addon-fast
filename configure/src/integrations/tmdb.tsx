@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 export default function TMDB() {
-  const { sessionId, setSessionId, saveConfigToStorage } = useConfig();
+  const { sessionId, setSessionId, tmdbApiKey } = useConfig();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const popupCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -19,7 +19,8 @@ export default function TMDB() {
         throw new Error('Invalid request token');
       }
       
-      const response = await fetch(`/session_id?request_token=${encodeURIComponent(requestToken)}`);
+      const apiKeyParam = tmdbApiKey?.trim() ? `&api_key=${encodeURIComponent(tmdbApiKey.trim())}` : '';
+      const response = await fetch(`/session_id?request_token=${encodeURIComponent(requestToken)}${apiKeyParam}`);
       
       if (!response.ok) {
         let errorMessage = 'Failed to create session';
@@ -59,12 +60,12 @@ export default function TMDB() {
     } finally {
       setIsLoading(false);
     }
-  }, [setSessionId]);
+  }, [setSessionId, tmdbApiKey]);
 
   useEffect(() => {
     // Escuta mensagens do popup OAuth
     const handleMessage = (event: MessageEvent) => {
-      // Verifica a origem da mensagem por segurança
+      // Verifica a origin da mensagem por segurança
       if (event.origin !== window.location.origin) {
         return;
       }
@@ -89,7 +90,7 @@ export default function TMDB() {
 
     window.addEventListener('message', handleMessage);
 
-    // Fallback: ainda verifica URL params caso não seja popup
+    // Fallback: còn kiểm tra URL params trường hợp không dùng popup
     const urlParams = new URLSearchParams(window.location.search);
     const requestToken = urlParams.get('request_token');
 
@@ -108,7 +109,8 @@ export default function TMDB() {
 
     try {
       const uuid = crypto.randomUUID();
-      const response = await fetch(`/request_token?cache_buster=${uuid}`);
+      const apiKeyParam = tmdbApiKey?.trim() ? `&api_key=${encodeURIComponent(tmdbApiKey.trim())}` : '';
+      const response = await fetch(`/request_token?cache_buster=${uuid}${apiKeyParam}`);
       
       if (!response.ok) {
         let errorMessage = 'Failed to get request token';
