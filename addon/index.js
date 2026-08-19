@@ -332,9 +332,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
     }
 
     try {
-      const resp = await cacheWrapMeta(`${language}:${type}:${tmdbId}`, async () => {
-        return await getMeta(type, language, tmdbId, config);
-      });
+      const resp = await getMeta(type, language, tmdbId, config);
       const cacheOpts = {
         staleRevalidate: 20 * 24 * 60 * 60,
         staleError: 30 * 24 * 60 * 60,
@@ -367,9 +365,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
     try {
       const tmdbId = await getTmdb(type, imdbId, config);
       if (tmdbId) {
-        const resp = await cacheWrapMeta(`${language}:${type}:${tmdbId}`, async () => {
-          return await getMeta(type, language, tmdbId, config);
-        });
+        const resp = await getMeta(type, language, tmdbId, config);
         const cacheOpts = {
           staleRevalidate: 20 * 24 * 60 * 60,
           staleError: 30 * 24 * 60 * 60,

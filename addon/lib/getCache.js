@@ -29,6 +29,15 @@ const NO_CACHE = process.env.NO_CACHE === 'true' || process.env.NO_CACHE === tru
 const REDIS_URL = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL || process.env.KV_URL;
 const MONGODB_URI = process.env.MONGODB_URI;
 
+// Hỗ trợ Redis Cluster
+const REDIS_IS_CLUSTER = process.env.REDIS_IS_CLUSTER === 'true';
+const REDIS_CLUSTER_NODES = process.env.REDIS_CLUSTER_NODES
+  ? process.env.REDIS_CLUSTER_NODES.split(',').map(node => {
+      const [host, port] = node.trim().split(':');
+      return { host, port: parseInt(port, 10) || 6379 };
+    })
+  : [];
+
 // Redis instance global (se disponível)
 let redisInstance = null;
 
@@ -55,31 +64,62 @@ let mongoCache = null;
 function initiateCache() {
   if (NO_CACHE) {
     return null;
+  }
+
+  if (REDIS_IS_CLUSTER && REDIS_CLUSTER_NODES.length > 0) {
+    try {
+      console.log('[Cache] Initializing Redis CLUSTER client...');
+      redisInstance = new Redis.Cluster(REDIS_CLUSTER_NODES, {
+        redisOptions: {
+          maxRetriesPerRequest: 3,
+          tls: process.env.REDIS_USE_TLS === 'true' ? { rejectUnauthorized: false } : undefined,
+        },
+        clusterRetryStrategy: (times) => Math.min(times * 100, 2000)
+      });
+
+      redisInstance.on('connect', () => console.log('[Redis Cluster] Connected successfully'));
+      redisInstance.on('ready', () => console.log('[Redis Cluster] Ready to accept commands'));
+      redisInstance.on('error', (err) => console.error('[Redis Cluster] Error:', err.message));
+
+      return cacheManager.caching({
+        store: redisStore,
+        redisInstance: redisInstance,
+        ttl: META_TTL
+      });
+    } catch (err) {
+      console.error('[Cache] Failed to initialize Redis Cluster, falling back to memory:', err.message);
+    }
   } else if (REDIS_URL) {
     try {
-      console.log('[Cache] Initializing Redis cache with URL configured');
+      console.log('[Cache] Initializing Redis client with URL configured...');
+      const isUpstash = REDIS_URL.includes('upstash.io');
+      const usesTLS = REDIS_URL.startsWith('rediss://') || process.env.REDIS_USE_TLS === 'true';
+
       const redisOptions = {
-        maxRetriesPerRequest: 2,
-        connectTimeout: 8000,
+        maxRetriesPerRequest: 3,
+        retryDelayOnFailover: 100,
+        connectTimeout: 10000,
         enableReadyCheck: false,
+        lazyConnect: false,
+        tls: (isUpstash || usesTLS) ? { rejectUnauthorized: false } : undefined,
         retryStrategy(times) {
           if (times > 3) return null; // Prevent hanging retries on serverless cold starts
           return Math.min(times * 100, 1000);
         }
       };
 
-      if (REDIS_URL.startsWith('rediss://')) {
-        redisOptions.tls = { rejectUnauthorized: false };
-      }
-
       redisInstance = new Redis(REDIS_URL, redisOptions);
 
       redisInstance.on('connect', () => {
-        console.log('[Cache] Connected to Redis successfully');
+        console.log('[Redis] Connected successfully');
+      });
+
+      redisInstance.on('ready', () => {
+        console.log('[Redis] Ready to accept commands');
       });
 
       redisInstance.on('error', (error) => {
-        console.error('[Cache] Redis connection error:', error.message);
+        console.error('[Redis] Connection error:', error.message);
       });
 
       return cacheManager.caching({
@@ -95,13 +135,13 @@ function initiateCache() {
         max: MEMORY_CACHE_MAX_KEYS
       });
     }
-  } else {
-    return cacheManager.caching({
-      store: 'memory',
-      ttl: META_TTL,
-      max: MEMORY_CACHE_MAX_KEYS
-    });
   }
+
+  return cacheManager.caching({
+    store: 'memory',
+    ttl: META_TTL,
+    max: MEMORY_CACHE_MAX_KEYS
+  });
 }
 
 async function initiateMongoCache() {

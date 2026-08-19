@@ -6,7 +6,7 @@ const { getLogo, getTvLogo } = require("./getLogo");
 const { getImdbRating } = require("./getImdbRating");
 const { getCachedAgeRating } = require("./getAgeRating");
 const { checkSeasonsAndReport } = require("../utils/checkSeasons");
-const { ramMetaCache, ramImdbCache } = require("./getCache");
+const { ramMetaCache, ramImdbCache, cacheWrapMeta } = require("./getCache");
 
 const blacklistLogoUrls = ["https://assets.fanart.tv/fanart/tv/0/hdtvlogo/-60a02798b7eea.png"];
 
@@ -409,34 +409,36 @@ async function getMeta(type, language, tmdbId, config = {}) {
         });
     }
 
-    try {
-        const moviedb = getTmdbClient(config);
-        // First, fetch raw TMDB data with 404 handling
-        const tmdbRes = (type === "movie")
-            ? await fetchMovieData(moviedb, tmdbId, language)
-            : await fetchTvData(moviedb, tmdbId, language);
+    return cacheWrapMeta(cacheKey, async () => {
+        try {
+            const moviedb = getTmdbClient(config);
+            // First, fetch raw TMDB data with 404 handling
+            const tmdbRes = (type === "movie")
+                ? await fetchMovieData(moviedb, tmdbId, language)
+                : await fetchTvData(moviedb, tmdbId, language);
 
-        if (!tmdbRes) {
-            console.warn(`TMDB ${type} not found: ${tmdbId} (${language})`);
-            // Return empty meta on 404 instead of throwing
+            if (!tmdbRes) {
+                console.warn(`TMDB ${type} not found: ${tmdbId} (${language})`);
+                // Return empty meta on 404 instead of throwing
+                return { meta: {} };
+            }
+
+            // Build the meta object
+            const meta = (type === "movie")
+                ? await buildMovieResponse(tmdbRes, type, language, tmdbId, config)
+                : await buildTvResponse(tmdbRes, type, language, tmdbId, config);
+
+            // Cache and return in L1 RAM cache
+            if (ramMetaCache) {
+                await ramMetaCache.set(cacheKey, meta);
+            }
+            return { meta };
+        } catch (error) {
+            // Log and return empty meta instead of throwing to avoid crashing the process
+            console.error(`Error in getMeta: ${error?.message || error}`);
             return { meta: {} };
         }
-
-        // Build the meta object
-        const meta = (type === "movie")
-            ? await buildMovieResponse(tmdbRes, type, language, tmdbId, config)
-            : await buildTvResponse(tmdbRes, type, language, tmdbId, config);
-
-        // Cache and return
-        if (ramMetaCache) {
-            await ramMetaCache.set(cacheKey, meta);
-        }
-        return { meta };
-    } catch (error) {
-        // Log and return empty meta instead of throwing to avoid crashing the process
-        console.error(`Error in getMeta: ${error?.message || error}`);
-        return { meta: {} };
-    }
+    });
 }
 
 module.exports = { getMeta };
