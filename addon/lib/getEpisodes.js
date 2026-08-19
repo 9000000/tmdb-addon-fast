@@ -55,12 +55,14 @@ function getThumbnailUrl(stillPath, hideEpisodeThumbnails, topposterskey = null,
 
 async function getEpisodes(language, tmdbId, imdb_id, seasons, config = {}) {
   const { hideEpisodeThumbnails = false, topposterskey = null, toppostersConfig = null } = config;
+  const returnImdbId = config.returnImdbId === true || config.returnImdbId === "true";
   const moviedb = getTmdbClient(config);
   const seasonString = genSeasonsString(seasons);
   const tmdbIdStr = String(tmdbId);
   const difOrder = diferentOrder.find((data) => String(data.tmdbId) === tmdbIdStr);
   const difImdbId = diferentImdbId.find((data) => String(data.tmdbId) === tmdbIdStr);
   imdb_id = !difImdbId ? imdb_id : difImdbId.imdbId;
+  const useImdbId = returnImdbId && imdb_id;
 
   if (difOrder != undefined) {
     return await moviedb
@@ -70,8 +72,8 @@ async function getEpisodes(language, tmdbId, imdb_id, seasons, config = {}) {
           .map((group) =>
             group.episodes.map((episode, index) => ({
               id: difOrder.watchOrderOnly
-                ? `${imdb_id}:${episode.season_number}:${episode.episode_number}`
-                : `${imdb_id}:${group.order}:${index + 1}`,
+                ? (useImdbId ? `${imdb_id}:${episode.season_number}:${episode.episode_number}` : `tmdb:${tmdbId}:${episode.season_number}:${episode.episode_number}`)
+                : (useImdbId ? `${imdb_id}:${group.order}:${index + 1}` : `tmdb:${tmdbId}:${group.order}:${index + 1}`),
               name: episode.name,
               season: group.order,
               episode: index + 1,
@@ -103,14 +105,14 @@ async function getEpisodes(language, tmdbId, imdb_id, seasons, config = {}) {
               if (res[season]) {
                 res[season].episodes.map((episode, index) => {
                   episodes.push({
-                    id: imdb_id
-                      ? `${imdb_id}:${episode.season_number}:${index + 1}`
-                      : `tmdb:${tmdbId}:${episode.season_number}:${index + 1}`,
+                    id: useImdbId
+                      ? `${imdb_id}:${episode.season_number}:${episode.episode_number}`
+                      : `tmdb:${tmdbId}:${episode.season_number}:${episode.episode_number}`,
                     name: episode.name,
                     season: episode.season_number,
-                    number: index + 1,
-                    episode: index + 1,
-                    thumbnail: getThumbnailUrl(episode.still_path, hideEpisodeThumbnails, topposterskey, toppostersConfig, tmdbId, episode.season_number, index + 1),
+                    number: episode.episode_number,
+                    episode: episode.episode_number,
+                    thumbnail: getThumbnailUrl(episode.still_path, hideEpisodeThumbnails, topposterskey, toppostersConfig, tmdbId, episode.season_number, episode.episode_number),
                     overview: episode.overview,
                     description: episode.overview,
                     rating: episode.vote_average.toString(),

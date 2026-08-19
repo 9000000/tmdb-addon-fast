@@ -252,7 +252,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, config = {}) => {
             collectionRaw
         ),
         behaviorHints: {
-            defaultVideoId: res.imdb_id ? res.imdb_id : `tmdb:${res.id}`,
+            defaultVideoId: (returnImdbId && res.imdb_id) ? res.imdb_id : `tmdb:${tmdbId}`,
             hasScheduledVideos: false
         },
         logo: processLogo(logo),

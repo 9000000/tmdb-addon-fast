@@ -1,0 +1,15 @@
+2026-08-19 11:06:28.281 [info] [Route] META START type=movie id=tmdb:1930 lang=en-US
+2026-08-19 11:06:28.281 [info] [Meta] RAM MISS type=movie tmdbId=1930 lang=en-US
+2026-08-19 11:06:28.352 [info] [Redis GET] MISS key=tmdb-addon|meta:movie-en-US-1930-t0-free-rpdb--{"posterType":"poster-default","style":"modern","thumbnailBadgePosition":"top-right","thumbnailBadgeSize":"small","thumbnailBlur":false}-ageRating:true-true-true-returnImdbId:true latency=72ms
+2026-08-19 11:06:28.352 [info] [Meta] FETCH START type=movie tmdbId=1930 lang=en-US
+2026-08-19 11:06:28.364 [info] [Meta] TMDB OK: type=movie tmdbId=1930 title="The Amazing Spider-Man" fetchTime=11ms
+2026-08-19 11:06:28.435 [info] [Redis GET] MISS key=logo:movie:1930:en-US latency=71ms
+2026-08-19 11:06:28.714 [info] [Redis SET] OK key=logo:movie:1930:en-US ttl=604800s size=103B latency=245ms
+2026-08-19 11:06:28.714 [info] [CacheWrap] MISS key=logo:movie:1930:en-US latency=350ms (fetched from source)
+2026-08-19 11:06:28.736 [info] [Meta] IMDb rating FETCHED: tt0948470 = 6.9 (21ms)
+2026-08-19 11:06:28.737 [info] [Meta] BUILD OK: type=movie tmdbId=1930 id=tt0948470 buildTime=373ms totalFetch=384ms
+2026-08-19 11:06:28.737 [info] [Meta] RAM SET: tmdbId=1930
+2026-08-19 11:06:28.985 [info] [Redis SET] OK key=tmdb-addon|meta:movie-en-US-1930-t0-free-rpdb--{"posterType":"poster-default","style":"modern","thumbnailBadgePosition":"top-right","thumbnailBadgeSize":"small","thumbnailBlur":false}-ageRating:true-true-true-returnImdbId:true ttl=432000s size=3511B latency=248ms
+2026-08-19 11:06:28.986 [info] [CacheWrap] MISS key=tmdb-addon|meta:movie-en-US-1930-t0-free-rpdb--{"posterType":"poster-default","style":"modern","thumbnailBadgePosition":"top-right","thumbnailBadgeSize":"small","thumbnailBlur":false}-ageRating:true-true-true-returnImdbId:true latency=704ms (fetched from source)
+2026-08-19 11:06:28.986 [info] [Meta] DONE type=movie tmdbId=1930 hasData=true totalTime=704ms
+2026-08-19 11:06:28.986 [info] [Route] META DONE type=movie tmdbId=1930 hasData=true totalTime=705ms
