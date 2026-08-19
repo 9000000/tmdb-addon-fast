@@ -4,7 +4,7 @@
 
 > A powerful Stremio addon that enhances your streaming experience with TMDB metadata
 
-[![Version](https://img.shields.io/badge/version-3.1.7-blue.svg)](https://github.com/mrcanelas/tmdb-addon)
+[![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](https://github.com/mrcanelas/tmdb-addon)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 
 ## 🌟 Features

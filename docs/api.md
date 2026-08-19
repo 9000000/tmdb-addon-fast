@@ -30,7 +30,7 @@ Returns the Stremio addon manifest with addon details and available resources.
 ```json
 {
   "id": "tmdb-addon",
-  "version": "3.1.7",
+  "version": "6.0.0",
   "name": "The Movie Database Addon",
   "description": "Stremio addon that provides rich metadata for movies and TV shows from TMDB...",
   "resources": ["catalog", "meta"],

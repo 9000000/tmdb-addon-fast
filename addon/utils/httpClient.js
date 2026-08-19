@@ -28,7 +28,7 @@ const TMDB_DOMAINS = [
  */
 function shouldUseProxy(url) {
   if (!PROXY_CONFIG.enabled) return false;
-  
+
   try {
     const urlObj = new URL(url);
     return TMDB_DOMAINS.some(domain => urlObj.hostname.includes(domain));
@@ -47,13 +47,13 @@ function createAxiosInstance(url) {
   const config = {
     timeout: 30000,
     headers: {
-      'User-Agent': 'TMDB-Addon/3.1.7'
+      'User-Agent': 'TMDB-Addon/6.0.0'
     }
   };
 
   if (shouldUseProxy(url)) {
     console.log(`Using proxy for: ${url}`);
-    
+
     const proxyConfig = {
       host: PROXY_CONFIG.host,
       port: PROXY_CONFIG.port,
@@ -65,7 +65,7 @@ function createAxiosInstance(url) {
     }
 
     config.proxy = proxyConfig;
-    
+
     // Additional configuration for HTTPS through proxy
     if (PROXY_CONFIG.protocol === 'https') {
       config.httpsAgent = new https.Agent({
