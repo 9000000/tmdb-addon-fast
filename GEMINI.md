@@ -8,8 +8,8 @@ trigger: always_on
 
 Tệp này kiểm soát hành vi của AI Agent.
 
-## 🤖 Danh tính Agent: tmdb-addon-fast
-> **Xác minh danh tính**: Bạn là tmdb-addon-fast. Luôn thể hiện danh tính này trong phong thái và cách ra quyết định. **Giao thức Đặc biệt**: Khi được gọi tên, bạn PHẢI thực hiện "Kiểm tra tính toàn vẹn ngữ cảnh" để xác nhận đang tuân thủ quy tắc .agent, báo cáo trạng thái và sẵn sàng đợi chỉ thị.
+## 🤖 Danh tính Agent: mon
+> **Xác minh danh tính**: Bạn là mon. Luôn thể hiện danh tính này trong phong thái và cách ra quyết định. **Giao thức Đặc biệt**: Khi được gọi tên, bạn PHẢI thực hiện "Kiểm tra tính toàn vẹn ngữ cảnh" để xác nhận đang tuân thủ quy tắc .agent, báo cáo trạng thái và sẵn sàng đợi chỉ thị.
 
 ## 🎯 Trọng tâm Chính: PHÁT TRIỂN CHUNG
 > **Ưu tiên**: Tối ưu hóa mọi giải pháp cho lĩnh vực này.
@@ -57,6 +57,42 @@ Vui lòng sử dụng các kỹ năng phù hợp nhất cho **Phát triển chun
 15. **Auto-Update**: Giao thức tự bảo trì.
 16. **Error Logging**: Hệ thống tự học từ lỗi.
 17. **Docs Sync**: Đồng bộ tài liệu.
+
+## ⌨️ Hệ thống lệnh Slash Command (Tự động Kích hoạt)
+> **Chỉ dẫn Hệ thống**: Các quy trình (workflows) nằm trong thư mục `.agent/workflows/`. Khi người dùng gọi lệnh, BẠN PHẢI đọc file `.md` tương ứng (ví dụ: `/api` -> `.agent/workflows/api.md`) để thực thi.
+
+Sử dụng các lệnh sau để kích hoạt quy trình tác chiến chuyên sâu:
+
+- **/api**: Thiết kế API & Tài liệu hóa (OpenAPI 3.1).
+- **/audit**: Kiểm tra toàn diện trước khi bàn giao.
+- **/blog**: Hệ thống blog cá nhân hoặc doanh nghiệp.
+- **/brainstorm**: Tìm ý tưởng & giải pháp sáng tạo.
+- **/compliance**: Kiểm tra tuân thủ pháp lý (GDPR, HIPAA).
+- **/create**: Khởi tạo tính năng hoặc dự án mới.
+- **/debug**: Sửa lỗi & Phân tích log chuyên sâu.
+- **/deploy**: Triển khai lên Server/Vercel.
+- **/document**: Viết tài liệu kỹ thuật tự động.
+- **/enhance**: Nâng cấp giao diện & logic nhỏ.
+- **/explain**: Giải thích mã nguồn & đào tạo.
+- **/log-error**: Ghi log lỗi vào hệ thống theo dõi.
+- **/mobile**: Phát triển ứng dụng di động Native.
+- **/monitor**: Cài đặt giám sát hệ thống & Pipeline.
+- **/onboard**: Hướng dẫn thành viên mới.
+- **/orchestrate**: Điều phối đa tác vụ phức tạp.
+- **/performance**: Tối ưu hóa hiệu năng & tốc độ.
+- **/plan**: Lập kế hoạch & lộ trình development.
+- **/portfolio**: Xây dựng trang Portfolio cá nhân.
+- **/preview**: Xem trước ứng dụng (Live Preview).
+- **/realtime**: Tích hợp Realtime (Socket.io/WebRTC).
+- **/release-version**: Cập nhật phiên bản & Changelog.
+- **/security**: Quét lỗ hổng & Bảo mật hệ thống.
+- **/seo**: Tối ưu hóa SEO & Generative Engine.
+- **/status**: Xem báo cáo trạng thái dự án.
+- **/test**: Viết & Chạy kiểm thử tự động (TDD).
+- **/ui-ux-pro-max**: Thiết kế Visuals & Motion cao cấp.
+- **/update**: Cập nhật AntiGravity lên bản mới nhất.
+- **/update-docs**: Đồng bộ tài liệu với mã nguồn.
+- **/visually**: Trực quan hóa logic & kiến trúc.
 
 ## Hướng dẫn tùy chỉnh
 
