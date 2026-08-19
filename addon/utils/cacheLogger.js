@@ -229,23 +229,25 @@ function logStatsSummary() {
   console.log('═════════════════════════════════════════════\n');
 }
 
-// Auto-log stats summary every 5 minutes
+// Auto-log stats summary based on time elapsed instead of setInterval to avoid Vercel serverless hangs
 const STATS_INTERVAL = parseInt(process.env.STATS_INTERVAL_MS, 10) || 5 * 60 * 1000;
-let statsInterval = null;
+let lastStatsLogTime = Date.now();
+
+function checkAndLogStats() {
+  const now = Date.now();
+  if (now - lastStatsLogTime >= STATS_INTERVAL) {
+    logStatsSummary();
+    lastStatsLogTime = now;
+  }
+}
 
 function startStatsReporting() {
-  if (statsInterval) return;
-  statsInterval = setInterval(logStatsSummary, STATS_INTERVAL);
-  // Don't prevent process from exiting
-  if (statsInterval.unref) statsInterval.unref();
-  logInfo('Logger', `📊 Stats reporting started (every ${formatMs(STATS_INTERVAL)})`);
+  // No-op in serverless to avoid setInterval. Stats are checked on request via checkAndLogStats().
+  logInfo('Logger', `📊 Stats reporting enabled (checks every ${formatMs(STATS_INTERVAL)} upon request)`);
 }
 
 function stopStatsReporting() {
-  if (statsInterval) {
-    clearInterval(statsInterval);
-    statsInterval = null;
-  }
+  // No-op
 }
 
 // --- Helpers ---

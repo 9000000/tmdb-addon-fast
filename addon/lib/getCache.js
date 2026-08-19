@@ -190,14 +190,16 @@ async function cacheWrap(key, method, options) {
   }
   const t = logger.startTimer();
   try {
-    const result = await cache.wrap(key, method, options);
-    const elapsed = logger.endTimer(t);
-    // cache.wrap returns cached value on hit, or calls method on miss
-    // We can't easily distinguish, but elapsed < 5ms is likely a hit
-    if (elapsed < 5) {
-      logger.logCacheHit('redis', key, elapsed);
-    } else {
-      logger.logCacheMiss('redis', key, elapsed);
+    const cached = await cache.get(key);
+    if (cached) {
+      logger.logCacheHit('redis', key, logger.endTimer(t));
+      return cached;
+    }
+    
+    logger.logCacheMiss('redis', key, logger.endTimer(t));
+    const result = await method();
+    if (result) {
+      await cache.set(key, result, options);
     }
     return result;
   } catch (error) {
@@ -220,12 +222,16 @@ async function cacheWrapMongo(key, method, ttl) {
 
   const t = logger.startTimer();
   try {
-    const result = await mongo.wrap(key, method, { ttl });
-    const elapsed = logger.endTimer(t);
-    if (elapsed < 20) {
-      logger.logCacheHit('mongo', key, elapsed);
-    } else {
-      logger.logCacheMiss('mongo', key, elapsed);
+    const cached = await mongo.get(key);
+    if (cached) {
+      logger.logCacheHit('mongo', key, logger.endTimer(t));
+      return cached;
+    }
+    
+    logger.logCacheMiss('mongo', key, logger.endTimer(t));
+    const result = await method();
+    if (result) {
+      await mongo.set(key, result, { ttl });
     }
     return result;
   } catch (error) {
