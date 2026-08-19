@@ -12,7 +12,7 @@ function parsePositiveInt(value, defaultValue) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultValue;
 }
 
-const META_TTL = process.env.META_TTL || 7 * 24 * 60 * 60; // 7 day
+const META_TTL = process.env.META_TTL || 7 * 24 * 60 * 60; // 7 days
 const CATALOG_TTL = process.env.CATALOG_TTL || 1 * 24 * 60 * 60; // 1 day
 const MEMORY_CACHE_MAX_KEYS = parsePositiveInt(process.env.MEMORY_CACHE_MAX_KEYS, 5000);
 
@@ -25,8 +25,8 @@ const RAM_AGE_RATING_MAX_KEYS = parsePositiveInt(process.env.RAM_AGE_RATING_MAX_
 const RAM_USER_COUNTER_TTL = parsePositiveInt(process.env.RAM_USER_COUNTER_TTL, 86400); // 24 hours
 const RAM_USER_COUNTER_MAX_KEYS = parsePositiveInt(process.env.RAM_USER_COUNTER_MAX_KEYS, 100000);
 
-const NO_CACHE = process.env.NO_CACHE || false;
-const REDIS_URL = process.env.REDIS_URL;
+const NO_CACHE = process.env.NO_CACHE === 'true' || process.env.NO_CACHE === true;
+const REDIS_URL = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL || process.env.KV_URL;
 const MONGODB_URI = process.env.MONGODB_URI;
 
 // Redis instance global (se disponível)
@@ -56,12 +56,45 @@ function initiateCache() {
   if (NO_CACHE) {
     return null;
   } else if (REDIS_URL) {
-    redisInstance = new Redis(REDIS_URL);
-    return cacheManager.caching({
-      store: redisStore,
-      redisInstance: redisInstance,
-      ttl: META_TTL
-    });
+    try {
+      console.log('[Cache] Initializing Redis cache with URL configured');
+      const redisOptions = {
+        maxRetriesPerRequest: 2,
+        connectTimeout: 8000,
+        enableReadyCheck: false,
+        retryStrategy(times) {
+          if (times > 3) return null; // Prevent hanging retries on serverless cold starts
+          return Math.min(times * 100, 1000);
+        }
+      };
+
+      if (REDIS_URL.startsWith('rediss://')) {
+        redisOptions.tls = { rejectUnauthorized: false };
+      }
+
+      redisInstance = new Redis(REDIS_URL, redisOptions);
+
+      redisInstance.on('connect', () => {
+        console.log('[Cache] Connected to Redis successfully');
+      });
+
+      redisInstance.on('error', (error) => {
+        console.error('[Cache] Redis connection error:', error.message);
+      });
+
+      return cacheManager.caching({
+        store: redisStore,
+        redisInstance: redisInstance,
+        ttl: META_TTL
+      });
+    } catch (err) {
+      console.error('[Cache] Failed to initialize Redis store, falling back to memory:', err.message);
+      return cacheManager.caching({
+        store: 'memory',
+        ttl: META_TTL,
+        max: MEMORY_CACHE_MAX_KEYS
+      });
+    }
   } else {
     return cacheManager.caching({
       store: 'memory',
@@ -103,11 +136,16 @@ async function ensureMongoCache() {
   return mongoInitPromise;
 }
 
-function cacheWrap(key, method, options) {
+async function cacheWrap(key, method, options) {
   if (NO_CACHE || !cache) {
     return method();
   }
-  return cache.wrap(key, method, options);
+  try {
+    return await cache.wrap(key, method, options);
+  } catch (error) {
+    console.error(`[Cache] Error for key ${key}:`, error.message || error);
+    return method();
+  }
 }
 
 async function cacheWrapMongo(key, method, ttl) {
@@ -132,13 +170,42 @@ async function cacheWrapMongo(key, method, ttl) {
 }
 
 function cacheWrapCatalog(id, method) {
-  // Usa MongoDB para catalog
-  return cacheWrapMongo(`${CATALOG_KEY_PREFIX}:${id}`, method, CATALOG_TTL);
+  if (MONGODB_URI) {
+    return cacheWrapMongo(`${CATALOG_KEY_PREFIX}:${id}`, method, CATALOG_TTL);
+  }
+  return cacheWrap(`${CATALOG_KEY_PREFIX}:${id}`, method, { ttl: CATALOG_TTL });
 }
 
 function cacheWrapMeta(id, method) {
-  // Usa MongoDB para meta
-  return cacheWrapMongo(`${META_KEY_PREFIX}:${id}`, method, META_TTL);
+  if (MONGODB_URI) {
+    return cacheWrapMongo(`${META_KEY_PREFIX}:${id}`, method, META_TTL);
+  }
+  return cacheWrap(`${META_KEY_PREFIX}:${id}`, method, { ttl: META_TTL });
+}
+
+async function getCacheStatus() {
+  const status = {
+    noCache: !!NO_CACHE,
+    hasRedisUrl: !!REDIS_URL,
+    hasMongoUri: !!MONGODB_URI,
+    cacheType: NO_CACHE ? 'disabled' : (REDIS_URL ? 'redis' : (MONGODB_URI ? 'mongodb' : 'memory')),
+    redisConnected: false,
+    pingTimeMs: null,
+    error: null
+  };
+
+  if (redisInstance) {
+    try {
+      const start = Date.now();
+      const pong = await redisInstance.ping();
+      status.redisConnected = pong === 'PONG';
+      status.pingTimeMs = Date.now() - start;
+    } catch (err) {
+      status.error = err.message;
+    }
+  }
+
+  return status;
 }
 
 // Função para fechar conexões ao encerrar
@@ -167,5 +234,6 @@ module.exports = {
   ramMetaCache,
   ramImdbCache,
   ramAgeRatingCache,
-  ramUserCounterCache
+  ramUserCounterCache,
+  getCacheStatus
 };

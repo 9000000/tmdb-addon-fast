@@ -8,7 +8,7 @@ const { getSearch } = require("./lib/getSearch");
 const { getManifest, DEFAULT_LANGUAGE } = require("./lib/getManifest");
 const { getMeta } = require("./lib/getMeta");
 const { getTmdb } = require("./lib/getTmdb");
-const { cacheWrapMeta } = require("./lib/getCache");
+const { cacheWrapMeta, getCacheStatus } = require("./lib/getCache");
 const { getTrending } = require("./lib/getTrending");
 const { parseConfig, getRpdbPoster } = require("./utils/parseProps");
 const { getRequestToken, getSessionId } = require("./lib/getSession");
@@ -424,6 +424,20 @@ addon.get("/api/proxy/status", async function (req, res) {
     respond(res, proxyStatus);
   } catch (error) {
     console.error('Error checking proxy status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+addon.get("/api/cache/status", async function (req, res) {
+  try {
+    const status = await getCacheStatus();
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.json(status);
+  } catch (error) {
+    console.error('Error checking cache status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
