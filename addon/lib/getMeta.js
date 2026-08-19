@@ -389,7 +389,7 @@ async function getMeta(type, language, tmdbId, config = {}) {
     const cacheKey = getCacheKey(type, language, tmdbId, config);
     if (ramMetaCache) {
         const cachedData = await ramMetaCache.get(cacheKey);
-        if (cachedData) {
+        if (cachedData && typeof cachedData === 'object' && Object.keys(cachedData).length > 0) {
             return Promise.resolve({ meta: cachedData });
         }
     }
@@ -411,8 +411,8 @@ async function getMeta(type, language, tmdbId, config = {}) {
         };
     }
 
-    const result = await cacheWrapMeta(getCacheKey(type, language, tmdbId, config), async () => {
-        try {
+    try {
+        const result = await cacheWrapMeta(cacheKey, async () => {
             const moviedb = getTmdbClient(config);
             // First, fetch raw TMDB data with 404 handling
             const tmdbRes = (type === "movie")
@@ -421,7 +421,6 @@ async function getMeta(type, language, tmdbId, config = {}) {
 
             if (!tmdbRes) {
                 console.warn(`TMDB ${type} not found: ${tmdbId} (${language})`);
-                // Return empty meta on 404 instead of throwing
                 return { meta: {} };
             }
 
@@ -430,28 +429,31 @@ async function getMeta(type, language, tmdbId, config = {}) {
                 ? await buildMovieResponse(tmdbRes, type, language, tmdbId, config)
                 : await buildTvResponse(tmdbRes, type, language, tmdbId, config);
 
+            if (!meta || Object.keys(meta).length === 0) {
+                throw new Error(`Empty meta built for ${tmdbId}`);
+            }
+
             // Save to L1 RAM Cache before returning
             if (ramMetaCache) {
                 await ramMetaCache.set(cacheKey, meta);
             }
 
             return { meta };
-        } catch (error) {
-            // Log and return empty meta instead of throwing to avoid crashing the process
-            console.error(`Error in getMeta for ${tmdbId}: ${error?.message || error}`);
-            return { meta: {} };
-        }
-    });
+        });
 
-    // Warm up RAM cache if persistent cache hit (ramMetaCache was empty at start)
-    if (ramMetaCache && result?.meta && Object.keys(result.meta).length > 0) {
-        const stillEmpty = !(await ramMetaCache.get(cacheKey));
-        if (stillEmpty) {
-            await ramMetaCache.set(cacheKey, result.meta);
+        // Warm up RAM cache if persistent cache hit
+        if (ramMetaCache && result?.meta && Object.keys(result.meta).length > 0) {
+            const currentRam = await ramMetaCache.get(cacheKey);
+            if (!currentRam) {
+                await ramMetaCache.set(cacheKey, result.meta);
+            }
         }
+
+        return result || { meta: {} };
+    } catch (error) {
+        console.error(`Error in getMeta for ${tmdbId}: ${error?.message || error}`);
+        return { meta: {} };
     }
-
-    return result;
 }
 
 module.exports = { getMeta };
