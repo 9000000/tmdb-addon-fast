@@ -86,7 +86,7 @@ function getRedisClient() {
     maxRetriesPerRequest: 2,
     retryDelayOnFailover: 100,
     lazyConnect: false,
-    enableOfflineQueue: false, // Fail fast if Redis is down, don't buffer endless commands
+    enableOfflineQueue: true, // Allow commands to wait briefly during reconnection
     enableReadyCheck: true,
     connectTimeout: 8000,
     commandTimeout: 2000, // 2s max per Redis command
