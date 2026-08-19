@@ -1,9 +1,116 @@
 services:
+  # =========================================================================
+  # TMDB Addon Service
+  # =========================================================================
   tmdb-addon:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tmdb-addon:latest
     container_name: tmdb-addon
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PORT:-1337}:1337"
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Tùy chọn 1: Sử dụng file .env
     env_file:
       - .env
+    # Tùy chọn 2: Hoặc khai báo trực tiếp / ghi đè biến môi trường tại đây
+    environment:
+      # --- CẤU HÌNH BẮT BUỘC / QUAN TRỌNG ---
+      - PORT=1337
+      - NODE_ENV=production
+      - HOST_NAME=${HOST_NAME:-http://localhost:1337}
+      - FANART_API=${FANART_API}
+      # TMDB_API là tùy chọn nếu người dùng tự nhập qua giao diện web (/configure)
+      - TMDB_API=${TMDB_API}
+
+      # --- REDIS CACHE (KHUYẾN NGHỊ CHO PRODUCTION) ---
+      # Kết nối trực tiếp tới container redis trong cùng mạng docker
+      - REDIS_URL=redis://redis:6379
+      
+      # --- MONGODB CACHE & METRICS (TÙY CHỌN) ---
+      # Bỏ comment nếu muốn sử dụng MongoDB (kết nối container mongodb bên dưới hoặc cloud)
+      # - MONGODB_URI=mongodb://mongodb:27017/tmdb-addon?retryWrites=true
+      # - MONGODB_METRICS=mongodb://mongodb:27017/tmdb-metrics?retryWrites=true
+
+      # --- TRAKT INTEGRATION (TÙY CHỌN) ---
+      - TRAKT_CLIENT_ID=${TRAKT_CLIENT_ID}
+      - TRAKT_CLIENT_SECRET=${TRAKT_CLIENT_SECRET}
+      # - TRAKT_REDIRECT_URI=${HOST_NAME:-http://localhost:1337}/configure/oauth-callback
+
+      # --- THIẾT LẬP CACHE TTL & LIMITS (TÙY CHỌN) ---
+      - NO_CACHE=false
+      - META_TTL=604800          # 7 ngày (giây)
+      - CATALOG_TTL=86400        # 1 ngày (giây)
+      - MEMORY_CACHE_MAX_KEYS=5000
+      - RAM_META_TTL=3600
+      - RAM_META_MAX_KEYS=2000
+      - RAM_IMDB_TTL=86400
+      - RAM_IMDB_MAX_KEYS=5000
+      - RAM_AGE_RATING_TTL=3600
+      - RAM_AGE_RATING_MAX_KEYS=5000
+      - RAM_USER_COUNTER_TTL=86400
+      - RAM_USER_COUNTER_MAX_KEYS=100000
+
+      # --- METRICS & ANALYTICS (TÙY CHỌN) ---
+      - METRICS_USER=${METRICS_USER:-admin}
+      - METRICS_PASSWORD=${METRICS_PASSWORD:-admin}
+
+      # --- PROXY CONFIGURATION (TÙY CHỌN) ---
+      - TMDB_PROXY_ENABLED=false
+      # - TMDB_PROXY_HOST=127.0.0.1
+      # - TMDB_PROXY_PORT=1080
+      # - TMDB_PROXY_PROTOCOL=http
+      # - TMDB_PROXY_AUTH=false
+      # - TMDB_PROXY_USERNAME=
+      # - TMDB_PROXY_PASSWORD=
+
+      # --- TÍNH NĂNG KHÁC ---
+      # - GITHUB_TOKEN=
+      # - GITHUB_REPO=mrcanelas/tmdb-addon
+      # - OFFICIAL_INSTANCE_URL=https://94c8cb9f702d-tmdb-addon.baby-beamup.club
+
+  # =========================================================================
+  # Redis Service (Distributed Cache & Unique User Tracking)
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tmdb-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =========================================================================
+  # MongoDB Service (Tùy chọn - Lưu Catalog, Meta & Metrics)
+  # Bỏ comment nếu muốn chạy MongoDB nội bộ
+  # =========================================================================
+  # mongodb:
+  #   image: mongo:7.0
+  #   container_name: tmdb-mongodb
+  #   restart: unless-stopped
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongo_data:/data/db
+  #   healthcheck:
+  #     test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  redis_data:
+    driver: local
+  # mongo_data:
+  #   driver: local
