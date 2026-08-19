@@ -18,6 +18,7 @@ const { getTraktWatchlist, getTraktRecommendations } = require("./lib/getTraktLi
 const { blurImage } = require('./utils/imageProcessor');
 const { testProxy, PROXY_CONFIG } = require('./utils/httpClient');
 const { trackUser, getUserCount, getAggregatedUserCount, trackExternalUsers } = require('./utils/userCounter');
+const logger = require('./utils/cacheLogger');
 
 addon.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -249,6 +250,7 @@ addon.get("/:catalogChoices?/manifest.json", async function (req, res) {
 });
 
 addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (req, res) {
+  const tRoute = logger.startTimer();
   const { catalogChoices, type, id, extra } = req.params;
   const config = parseConfig(catalogChoices) || {};
   const language = config.language || DEFAULT_LANGUAGE;
@@ -260,6 +262,7 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
     : {};
   const page = Math.ceil(skip ? skip / 20 + 1 : undefined) || 1;
   let metas = [];
+  logger.logCatalogRequest(type, id, page, genre);
   try {
     const args = [type, language, page];
 
@@ -304,9 +307,12 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
       });
       return;
     }
+    logger.logError('Route', `Catalog error ${type}/${id}: ${(e || {}).message}`);
     res.status(404).send((e || {}).message || "Not found");
     return;
   }
+  const itemCount = metas?.metas?.length || 0;
+  logger.logCatalogResponse(type, id, itemCount, logger.endTimer(tRoute));
   const cacheOpts = {
     cacheMaxAge: 1 * 24 * 60 * 60,
     staleRevalidate: 7 * 24 * 60 * 60,
@@ -316,6 +322,7 @@ addon.get("/:catalogChoices?/catalog/:type/:id/:extra?.json", async function (re
 });
 
 addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
+  const tRoute = logger.startTimer();
   const { catalogChoices, type, id } = req.params;
   const config = parseConfig(catalogChoices) || {};
   const tmdbId = id.split(":")[1];
@@ -323,6 +330,8 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
   const imdbId = req.params.id.split(":")[0];
   delete config.catalogs
   delete config.streaming
+
+  logger.logRouteStart(`meta/${type}/${id}`, { language });
 
   if (id.includes("tmdb:")) {
     // Validate that tmdbId is numeric
@@ -343,6 +352,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
         const hasEnded = !!((resp.releaseInfo || "").length > 5);
         cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
       }
+      logger.logRouteEnd(`meta/${type}/tmdb:${tmdbId}`, logger.endTimer(tRoute), 200);
       respond(res, resp, cacheOpts);
     } catch (e) {
       // Handle missing or invalid TMDB API key error
@@ -356,7 +366,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
       if (e.message && (e.message.includes("404") || e.message.toLowerCase().includes("not found"))) {
         res.status(404).json({ error: "Content not found on TMDB" });
       } else {
-        console.error(`Error in meta route for ${type} ${tmdbId}:`, e);
+        logger.logError('Route', `Meta error for ${type} ${tmdbId}: ${e.message}`);
         res.status(500).json({ error: "Internal server error" });
       }
     }
@@ -376,6 +386,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
           const hasEnded = !!((resp.releaseInfo || "").length > 5);
           cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
         }
+        logger.logRouteEnd(`meta/${type}/${imdbId}`, logger.endTimer(tRoute), 200);
         respond(res, resp, cacheOpts);
       } else {
         respond(res, { meta: {} });
@@ -392,7 +403,7 @@ addon.get("/:catalogChoices?/meta/:type/:id.json", async function (req, res) {
       if (e.message && (e.message.includes("404") || e.message.toLowerCase().includes("not found"))) {
         res.status(404).json({ error: "Content not found on TMDB" });
       } else {
-        console.error(`Error in meta route for ${type} ${id}:`, e);
+        logger.logError('Route', `Meta error for ${type} ${id}: ${e.message}`);
         res.status(500).json({ error: "Internal server error" });
       }
     }

@@ -2,6 +2,7 @@ const cacheManager = require('cache-manager');
 const redisStore = require('cache-manager-ioredis');
 const Redis = require('ioredis');
 const { mongoDbStore } = require('@tirke/node-cache-manager-mongodb');
+const logger = require('../utils/cacheLogger');
 
 const GLOBAL_KEY_PREFIX = 'tmdb-addon';
 const META_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|meta`;
@@ -61,14 +62,20 @@ const ramUserCounterCache = createRamCache(RAM_USER_COUNTER_TTL, RAM_USER_COUNTE
 // Cache MongoDB para catalog e meta
 let mongoCache = null;
 
+// Log cache configuration on startup
+logger.logInfo('Cache', `Cache config: NO_CACHE=${NO_CACHE}, Redis=${!!REDIS_URL}, MongoDB=${!!MONGODB_URI}`);
+logger.logInfo('Cache', `TTLs: META=${META_TTL}s, CATALOG=${CATALOG_TTL}s, RAM_META=${RAM_META_TTL}s, RAM_IMDB=${RAM_IMDB_TTL}s`);
+logger.logInfo('Cache', `RAM limits: META=${RAM_META_MAX_KEYS}, IMDB=${RAM_IMDB_MAX_KEYS}, AGE=${RAM_AGE_RATING_MAX_KEYS}, MEMORY=${MEMORY_CACHE_MAX_KEYS}`);
+
 function initiateCache() {
   if (NO_CACHE) {
+    logger.logWarn('Cache', '⚠️ Cache is DISABLED (NO_CACHE=true)');
     return null;
   }
 
   if (REDIS_IS_CLUSTER && REDIS_CLUSTER_NODES.length > 0) {
     try {
-      console.log('[Cache] Initializing Redis CLUSTER client...');
+      logger.logInfo('Cache', 'Initializing Redis CLUSTER client...');
       redisInstance = new Redis.Cluster(REDIS_CLUSTER_NODES, {
         redisOptions: {
           maxRetriesPerRequest: 3,
@@ -77,9 +84,9 @@ function initiateCache() {
         clusterRetryStrategy: (times) => Math.min(times * 100, 2000)
       });
 
-      redisInstance.on('connect', () => console.log('[Redis Cluster] Connected successfully'));
-      redisInstance.on('ready', () => console.log('[Redis Cluster] Ready to accept commands'));
-      redisInstance.on('error', (err) => console.error('[Redis Cluster] Error:', err.message));
+      redisInstance.on('connect', () => logger.logInfo('Redis', '🟢 Cluster connected successfully'));
+      redisInstance.on('ready', () => logger.logInfo('Redis', '🟢 Cluster ready to accept commands'));
+      redisInstance.on('error', (err) => logger.logError('Redis', `🔴 Cluster error: ${err.message}`));
 
       return cacheManager.caching({
         store: redisStore,
@@ -87,11 +94,11 @@ function initiateCache() {
         ttl: META_TTL
       });
     } catch (err) {
-      console.error('[Cache] Failed to initialize Redis Cluster, falling back to memory:', err.message);
+      logger.logError('Cache', `Failed to initialize Redis Cluster, falling back to memory: ${err.message}`);
     }
   } else if (REDIS_URL) {
     try {
-      console.log('[Cache] Initializing Redis client with URL configured...');
+      logger.logInfo('Cache', 'Initializing Redis client with URL configured...');
       const isUpstash = REDIS_URL.includes('upstash.io');
       const usesTLS = REDIS_URL.startsWith('rediss://') || process.env.REDIS_USE_TLS === 'true';
 
@@ -111,15 +118,15 @@ function initiateCache() {
       redisInstance = new Redis(REDIS_URL, redisOptions);
 
       redisInstance.on('connect', () => {
-        console.log('[Redis] Connected successfully');
+        logger.logInfo('Redis', '🟢 Connected successfully');
       });
 
       redisInstance.on('ready', () => {
-        console.log('[Redis] Ready to accept commands');
+        logger.logInfo('Redis', '🟢 Ready to accept commands');
       });
 
       redisInstance.on('error', (error) => {
-        console.error('[Redis] Connection error:', error.message);
+        logger.logError('Redis', `🔴 Connection error: ${error.message}`);
       });
 
       return cacheManager.caching({
@@ -128,7 +135,7 @@ function initiateCache() {
         ttl: META_TTL
       });
     } catch (err) {
-      console.error('[Cache] Failed to initialize Redis store, falling back to memory:', err.message);
+      logger.logError('Cache', `Failed to initialize Redis store, falling back to memory: ${err.message}`);
       return cacheManager.caching({
         store: 'memory',
         ttl: META_TTL,
@@ -137,6 +144,7 @@ function initiateCache() {
     }
   }
 
+  logger.logInfo('Cache', '💾 Using in-memory cache (no Redis/MongoDB configured)');
   return cacheManager.caching({
     store: 'memory',
     ttl: META_TTL,
@@ -154,10 +162,10 @@ async function initiateMongoCache() {
       url: MONGODB_URI,
       ttl: META_TTL
     });
-    console.log('MongoDB cache conectado com sucesso');
+    logger.logInfo('Cache', '🟢 MongoDB cache connected successfully');
     return mongoCache;
   } catch (error) {
-    console.error('Erro ao conectar MongoDB cache:', error);
+    logger.logError('Cache', `🔴 MongoDB cache connection failed: ${error.message}`);
     return null;
   }
 }
@@ -180,10 +188,20 @@ async function cacheWrap(key, method, options) {
   if (NO_CACHE || !cache) {
     return method();
   }
+  const t = logger.startTimer();
   try {
-    return await cache.wrap(key, method, options);
+    const result = await cache.wrap(key, method, options);
+    const elapsed = logger.endTimer(t);
+    // cache.wrap returns cached value on hit, or calls method on miss
+    // We can't easily distinguish, but elapsed < 5ms is likely a hit
+    if (elapsed < 5) {
+      logger.logCacheHit('redis', key, elapsed);
+    } else {
+      logger.logCacheMiss('redis', key, elapsed);
+    }
+    return result;
   } catch (error) {
-    console.error(`[Cache] Error for key ${key}:`, error.message || error);
+    logger.logCacheError('redis', 'wrap', key, error);
     return method();
   }
 }
@@ -200,30 +218,43 @@ async function cacheWrapMongo(key, method, ttl) {
     return method();
   }
 
+  const t = logger.startTimer();
   try {
-    return await mongo.wrap(key, method, { ttl });
+    const result = await mongo.wrap(key, method, { ttl });
+    const elapsed = logger.endTimer(t);
+    if (elapsed < 20) {
+      logger.logCacheHit('mongo', key, elapsed);
+    } else {
+      logger.logCacheMiss('mongo', key, elapsed);
+    }
+    return result;
   } catch (error) {
-    console.error(`Erro no cache MongoDB para chave ${key}:`, error);
+    logger.logCacheError('mongo', 'wrap', key, error);
     // Em caso de erro, executa o método sem cache
     return method();
   }
 }
 
 function cacheWrapCatalog(id, method) {
+  const fullKey = `${CATALOG_KEY_PREFIX}:${id}`;
+  logger.logDebug('Cache', `📂 Catalog cache lookup: ${id}`);
   if (MONGODB_URI) {
-    return cacheWrapMongo(`${CATALOG_KEY_PREFIX}:${id}`, method, CATALOG_TTL);
+    return cacheWrapMongo(fullKey, method, CATALOG_TTL);
   }
-  return cacheWrap(`${CATALOG_KEY_PREFIX}:${id}`, method, { ttl: CATALOG_TTL });
+  return cacheWrap(fullKey, method, { ttl: CATALOG_TTL });
 }
 
 function cacheWrapMeta(id, method) {
+  const fullKey = `${META_KEY_PREFIX}:${id}`;
+  logger.logDebug('Cache', `📋 Meta cache lookup: ${id}`);
   if (MONGODB_URI) {
-    return cacheWrapMongo(`${META_KEY_PREFIX}:${id}`, method, META_TTL);
+    return cacheWrapMongo(fullKey, method, META_TTL);
   }
-  return cacheWrap(`${META_KEY_PREFIX}:${id}`, method, { ttl: META_TTL });
+  return cacheWrap(fullKey, method, { ttl: META_TTL });
 }
 
 async function getCacheStatus() {
+  const loggerStats = logger.getStats();
   const status = {
     noCache: !!NO_CACHE,
     hasRedisUrl: !!REDIS_URL,
@@ -231,7 +262,9 @@ async function getCacheStatus() {
     cacheType: NO_CACHE ? 'disabled' : (REDIS_URL ? 'redis' : (MONGODB_URI ? 'mongodb' : 'memory')),
     redisConnected: false,
     pingTimeMs: null,
-    error: null
+    error: null,
+    // Enhanced stats from logger
+    stats: loggerStats
   };
 
   if (redisInstance) {
@@ -250,11 +283,15 @@ async function getCacheStatus() {
 
 // Função para fechar conexões ao encerrar
 async function closeConnections() {
+  logger.logInfo('Cache', '🔌 Closing connections...');
+  logger.logStatsSummary(); // Print final stats before closing
+  logger.stopStatsReporting();
   if (redisInstance) {
     try {
       await redisInstance.quit();
+      logger.logInfo('Redis', '🔌 Connection closed');
     } catch (error) {
-      console.error("Error closing Redis connection:", error);
+      logger.logError('Redis', `Error closing connection: ${error.message}`);
     }
   }
   // O mongoCache gerencia suas próprias conexões através do store

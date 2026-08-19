@@ -1,73 +1,331 @@
-13:33:42.117 Running build in Washington, D.C., USA (East) – iad1
-13:33:42.117 Build machine configuration: 2 cores, 8 GB
-13:33:42.251 Cloning github.com/9000000/tmdb-addon-fast (Branch: tet2, Commit: 56ad239)
-13:33:42.797 Cloning completed: 546.000ms
-13:33:43.186 Restored build cache from previous deployment (9J6Vp5FwdP5Jr8zZusP1ecVmmKmX)
-13:33:43.454 Running "vercel build"
-13:33:43.474 Vercel CLI 59.1.4
-13:33:43.512 WARNING! Due to `builds` existing in your configuration file, the Build and Development Settings defined in your Project Settings will not apply. Learn More: https://vercel.link/unused-build-settings
-13:33:44.165 Installing dependencies...
-13:33:45.478 
-13:33:45.479 up to date in 1s
-13:33:45.479 
-13:33:45.479 104 packages are looking for funding
-13:33:45.479   run `npm fund` for details
-13:33:45.481 npm warn allow-scripts 3 packages have install scripts not yet covered by allowScripts:
-13:33:45.481 npm warn allow-scripts   @swc/core@1.10.14 (postinstall: node postinstall.js)
-13:33:45.481 npm warn allow-scripts   esbuild@0.21.5 (postinstall: node install.js)
-13:33:45.482 npm warn allow-scripts   sharp@0.33.5 (install: node install/check)
-13:33:45.482 npm warn allow-scripts
-13:33:45.483 npm warn allow-scripts Run `npm approve-scripts --allow-scripts-pending` to review, or `npm approve-scripts <pkg>` to allow.
-13:33:45.519 Running "npm run build"
-13:33:45.870 
-13:33:45.870 > tmdb-addon@6.0.0 build
-13:33:45.870 > vite build
-13:33:45.871 
-13:33:46.076 The CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.
-13:33:46.158 vite v5.4.19 building for production...
-13:33:46.219 transforming...
-13:33:46.603 Browserslist: browsers data (caniuse-lite) is 19 months old. Please run:
-13:33:46.604   npx update-browserslist-db@latest
-13:33:46.604   Why you should do it regularly: https://github.com/browserslist/update-db#readme
-13:33:51.377 ✓ 2268 modules transformed.
-13:33:51.662 rendering chunks...
-13:33:52.218 computing gzip size...
-13:33:52.244 dist/index.html                               0.93 kB │ gzip:   0.45 kB
-13:33:52.245 dist/assets/index-Ditr4oyM.css               40.02 kB │ gzip:   7.62 kB
-13:33:52.245 dist/assets/DefaultIntegration-B5fszpGc.js    0.29 kB │ gzip:   0.22 kB
-13:33:52.245 dist/assets/loader-circle-BydVDPtS.js         0.32 kB │ gzip:   0.26 kB
-13:33:52.246 dist/assets/label-BlDqI5i5.js                 1.14 kB │ gzip:   0.63 kB
-13:33:52.246 dist/assets/alert-DimX5YPp.js                 1.28 kB │ gzip:   0.67 kB
-13:33:52.246 dist/assets/gemini-XIE4oeO_.js                1.94 kB │ gzip:   0.94 kB
-13:33:52.246 dist/assets/streaming-D3Tk4E5P.js             1.98 kB │ gzip:   0.92 kB
-13:33:52.246 dist/assets/groq-BQabWVdw.js                  2.02 kB │ gzip:   1.00 kB
-13:33:52.247 dist/assets/tmdb-CEpWTKq1.js                  3.31 kB │ gzip:   1.49 kB
-13:33:52.247 dist/assets/mdblist-8yesUR23.js               3.40 kB │ gzip:   1.40 kB
-13:33:52.247 dist/assets/rpdb-ZIvwFwb1.js                  3.45 kB │ gzip:   1.32 kB
-13:33:52.247 dist/assets/trakt-wnQigsh6.js                 4.08 kB │ gzip:   1.72 kB
-13:33:52.247 dist/assets/topposters-CUHk-WZF.js            6.43 kB │ gzip:   1.79 kB
-13:33:52.247 dist/assets/index-DBeISDCv.js               723.69 kB │ gzip: 225.59 kB
-13:33:52.247 
-13:33:52.247 (!) Some chunks are larger than 500 kB after minification. Consider:
-13:33:52.247 - Using dynamic import() to code-split the application
-13:33:52.248 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
-13:33:52.248 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-13:33:52.248 ✓ built in 6.06s
-13:33:58.643 Warning: Node.js functions are compiled from ESM to CommonJS. If this is not intended, add "type": "module" to your package.json file.
-13:33:58.643 Compiling "loader-circle-BydVDPtS.js" from ESM to CommonJS...
-13:33:58.695 Compiling "DefaultIntegration-B5fszpGc.js" from ESM to CommonJS...
-13:33:58.701 Compiling "label-BlDqI5i5.js" from ESM to CommonJS...
-13:33:58.718 Compiling "alert-DimX5YPp.js" from ESM to CommonJS...
-13:33:58.743 Compiling "streaming-D3Tk4E5P.js" from ESM to CommonJS...
-13:33:58.793 Compiling "gemini-XIE4oeO_.js" from ESM to CommonJS...
-13:33:58.831 Compiling "groq-BQabWVdw.js" from ESM to CommonJS...
-13:33:58.870 Compiling "rpdb-ZIvwFwb1.js" from ESM to CommonJS...
-13:33:58.914 Compiling "mdblist-8yesUR23.js" from ESM to CommonJS...
-13:33:58.941 Compiling "tmdb-CEpWTKq1.js" from ESM to CommonJS...
-13:33:58.962 Compiling "trakt-wnQigsh6.js" from ESM to CommonJS...
-13:33:58.981 Compiling "topposters-CUHk-WZF.js" from ESM to CommonJS...
-13:33:59.002 Compiling "index-DBeISDCv.js" from ESM to CommonJS...
-13:34:02.191 Build Completed in /vercel/output [18s]
-13:34:02.236 Deploying outputs...
-13:34:10.388 Deployment completed
-13:34:10.516 Creating build cache...
+2026-08-19 13:34:28.015 [error] Error fetching data from Cinemeta: AxiosError: timeout of 10000ms exceeded
+    at RedirectableRequest.handleRequestTimeout (/var/task/node_modules/axios/dist/node/axios.cjs:3228:16)
+    at RedirectableRequest.emit (node:events:509:28)
+    at Timeout.<anonymous> (/var/task/node_modules/follow-redirects/index.js:221:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+    at Axios.request (/var/task/node_modules/axios/dist/node/axios.cjs:4280:41)
+    at async getImdbRating (/var/task/addon/lib/getImdbRating.js:5:22)
+    at async getCachedImdbRating (/var/task/addon/lib/getMeta.js:96:24)
+    at async Promise.all (index 1)
+    at async buildMovieResponse (/var/task/addon/lib/getMeta.js:192:52)
+    at async /var/task/addon/lib/getMeta.js:428:19 {
+  code: 'ECONNABORTED',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 10000,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': undefined,
+      'User-Agent': 'axios/1.10.0',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    method: 'get',
+    url: 'https://v3-cinemeta.strem.io/meta/movie/tt0249443.json',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> Writable {
+    _events: {
+      close: undefined,
+      error: [Function: handleRequestError],
+      prefinish: undefined,
+      finish: undefined,
+      drain: undefined,
+      response: [Function: handleResponse],
+      socket: [Array],
+      timeout: undefined,
+      abort: undefined
+    },
+    _writableState: WritableState {
+      highWaterMark: 65536,
+      length: 0,
+      corked: 0,
+      onwrite: [Function (anonymous)],
+      writelen: 0,
+      bufferedIndex: 0,
+      pendingcb: 0,
+      Symbol(kState): 17580812,
+      Symbol(kBufferedValue): null
+    },
+    _maxListeners: undefined,
+    _options: {
+      maxRedirects: 21,
+      maxBodyLength: Infinity,
+      protocol: 'https:',
+      path: '/meta/movie/tt0249443.json',
+      method: 'GET',
+      headers: [Object: null prototype],
+      agents: [Object],
+      auth: undefined,
+      family: undefined,
+      beforeRedirect: [Function: dispatchBeforeRedirect],
+      beforeRedirects: [Object],
+      hostname: 'v3-cinemeta.strem.io',
+      port: '',
+      agent: undefined,
+      nativeProtocols: [Object],
+      pathname: '/meta/movie/tt0249443.json'
+    },
+    _ended: true,
+    _ending: true,
+    _redirectCount: 0,
+    _redirects: [],
+    _requestBodyLength: 0,
+    _requestBodyBuffers: [],
+    _eventsCount: 3,
+    _onNativeResponse: [Function (anonymous)],
+    _currentRequest: ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: false,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: false,
+      _header: 'GET /meta/movie/tt0249443.json HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'User-Agent: axios/1.10.0\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'x-vercel-id: cdg1::p679s-1787146448602-a5b8822c7de3\r\n' +
+        'x-invocation-id: cdg1::p679s-1787146448602-a5b8822c7de3\r\n' +
+        'Host: v3-cinemeta.strem.io\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      _ended: false,
+      res: null,
+      aborted: false,
+      timeoutCb: [Function: emitRequestTimeout],
+      upgradeOrConnect: false,
+      parser: [HTTPParser],
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'v3-cinemeta.strem.io',
+      protocol: 'https:',
+      _redirectable: [Circular *1],
+      Symbol(shapeMode): false,
+      Symbol(kCapture): false,
+      Symbol(kBytesWritten): 0,
+      Symbol(kNeedDrain): false,
+      Symbol(corked): 0,
+      Symbol(kChunkedBuffer): [],
+      Symbol(kChunkedLength): 0,
+      Symbol(kSocket): [TLSSocket],
+      Symbol(kOutHeaders): [Object: null prototype],
+      Symbol(errored): null,
+      Symbol(kHighWaterMark): 65536,
+      Symbol(kRejectNonStandardBodyWrites): false,
+      Symbol(kPath): '/meta/movie/tt0249443.json',
+      Symbol(kUniqueHeaders): null
+    },
+    _currentUrl: 'https://v3-cinemeta.strem.io/meta/movie/tt0249443.json',
+    _timeout: null,
+    Symbol(shapeMode): true,
+    Symbol(kCapture): false
+  }
+}
+2026-08-19 13:34:28.017 [error] Error fetching data from Cinemeta: AxiosError: timeout of 10000ms exceeded
+    at RedirectableRequest.handleRequestTimeout (/var/task/node_modules/axios/dist/node/axios.cjs:3228:16)
+    at RedirectableRequest.emit (node:events:509:28)
+    at Timeout.<anonymous> (/var/task/node_modules/follow-redirects/index.js:221:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+    at Axios.request (/var/task/node_modules/axios/dist/node/axios.cjs:4280:41)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:567:9)
+    at process.processTimers (node:internal/timers:541:7)
+    at async getImdbRating (/var/task/addon/lib/getImdbRating.js:5:22)
+    at async getCachedImdbRating (/var/task/addon/lib/getMeta.js:96:24)
+    at async Promise.all (index 1)
+    at async buildMovieResponse (/var/task/addon/lib/getMeta.js:192:52)
+    at async /var/task/addon/lib/getMeta.js:428:19 {
+  code: 'ECONNABORTED',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 10000,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': undefined,
+      'User-Agent': 'axios/1.10.0',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    method: 'get',
+    url: 'https://v3-cinemeta.strem.io/meta/movie/tt7405174.json',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },
+  request: <ref *1> Writable {
+    _events: {
+      close: undefined,
+      error: [Function: handleRequestError],
+      prefinish: undefined,
+      finish: undefined,
+      drain: undefined,
+      response: [Function: handleResponse],
+      socket: [Array],
+      timeout: undefined,
+      abort: undefined
+    },
+    _writableState: WritableState {
+      highWaterMark: 65536,
+      length: 0,
+      corked: 0,
+      onwrite: [Function (anonymous)],
+      writelen: 0,
+      bufferedIndex: 0,
+      pendingcb: 0,
+      Symbol(kState): 17580812,
+      Symbol(kBufferedValue): null
+    },
+    _maxListeners: undefined,
+    _options: {
+      maxRedirects: 21,
+      maxBodyLength: Infinity,
+      protocol: 'https:',
+      path: '/meta/movie/tt7405174.json',
+      method: 'GET',
+      headers: [Object: null prototype],
+      agents: [Object],
+      auth: undefined,
+      family: undefined,
+      beforeRedirect: [Function: dispatchBeforeRedirect],
+      beforeRedirects: [Object],
+      hostname: 'v3-cinemeta.strem.io',
+      port: '',
+      agent: undefined,
+      nativeProtocols: [Object],
+      pathname: '/meta/movie/tt7405174.json'
+    },
+    _ended: true,
+    _ending: true,
+    _redirectCount: 0,
+    _redirects: [],
+    _requestBodyLength: 0,
+    _requestBodyBuffers: [],
+    _eventsCount: 3,
+    _onNativeResponse: [Function (anonymous)],
+    _currentRequest: ClientRequest {
+      _events: [Object: null prototype],
+      _eventsCount: 7,
+      _maxListeners: undefined,
+      outputData: [],
+      outputSize: 0,
+      writable: true,
+      destroyed: false,
+      _last: true,
+      chunkedEncoding: false,
+      shouldKeepAlive: true,
+      maxRequestsOnConnectionReached: false,
+      _defaultKeepAlive: true,
+      useChunkedEncodingByDefault: false,
+      sendDate: false,
+      _removedConnection: false,
+      _removedContLen: false,
+      _removedTE: false,
+      strictContentLength: false,
+      _contentLength: 0,
+      _hasBody: true,
+      _trailer: '',
+      finished: true,
+      _headerSent: true,
+      _closed: false,
+      _header: 'GET /meta/movie/tt7405174.json HTTP/1.1\r\n' +
+        'Accept: application/json, text/plain, */*\r\n' +
+        'User-Agent: axios/1.10.0\r\n' +
+        'Accept-Encoding: gzip, compress, deflate, br\r\n' +
+        'x-vercel-id: cdg1::p679s-1787146448602-a5b8822c7de3\r\n' +
+        'x-invocation-id: cdg1::p679s-1787146448602-a5b8822c7de3\r\n' +
+        'Host: v3-cinemeta.strem.io\r\n' +
+        'Connection: keep-alive\r\n' +
+        '\r\n',
+      _keepAliveTimeout: 0,
+      _onPendingData: [Function: nop],
+      agent: [Agent],
+      socketPath: undefined,
+      method: 'GET',
+      maxHeaderSize: undefined,
+      insecureHTTPParser: undefined,
+      joinDuplicateHeaders: undefined,
+      _ended: false,
+      res: null,
+      aborted: false,
+      timeoutCb: [Function: emitRequestTimeout],
+      upgradeOrConnect: false,
+      parser: [HTTPParser],
+      maxHeadersCount: null,
+      reusedSocket: false,
+      host: 'v3-cinemeta.strem.io',
+      protocol: 'https:',
+      _redirectable: [Circular *1],
+      Symbol(shapeMode): false,
+      Symbol(kCapture): false,
+      Symbol(kBytesWritten): 0,
+      Symbol(kNeedDrain): false,
+      Symbol(corked): 0,
+      Symbol(kChunkedBuffer): [],
+      Symbol(kChunkedLength): 0,
+      Symbol(kSocket): [TLSSocket],
+      Symbol(kOutHeaders): [Object: null prototype],
+      Symbol(errored): null,
+      Symbol(kHighWaterMark): 65536,
+      Symbol(kRejectNonStandardBodyWrites): false,
+      Symbol(kPath): '/meta/movie/tt7405174.json',
+      Symbol(kUniqueHeaders): null
+    },
+    _currentUrl: 'https://v3-cinemeta.strem.io/meta/movie/tt7405174.json',
+    _timeout: null,
+    Symbol(shapeMode): true,
+    Symbol(kCapture): false
+  }
+}

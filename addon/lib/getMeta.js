@@ -7,6 +7,7 @@ const { getImdbRating } = require("./getImdbRating");
 const { getCachedAgeRating } = require("./getAgeRating");
 const { checkSeasonsAndReport } = require("../utils/checkSeasons");
 const { ramMetaCache, ramImdbCache, cacheWrapMeta } = require("./getCache");
+const logger = require("../utils/cacheLogger");
 
 const blacklistLogoUrls = ["https://assets.fanart.tv/fanart/tv/0/hdtvlogo/-60a02798b7eea.png"];
 
@@ -88,18 +89,26 @@ const getCacheKey = (
 
 async function getCachedImdbRating(imdbId, type) {
     if (!imdbId) return null;
+    const t = logger.startTimer();
     if (ramImdbCache) {
         const cached = await ramImdbCache.get(imdbId);
-        if (cached) return cached;
+        if (cached) {
+            logger.logCacheHit('ram', `imdb:${imdbId}`, logger.endTimer(t));
+            return cached;
+        }
+        logger.logCacheMiss('ram', `imdb:${imdbId}`, logger.endTimer(t));
     }
     try {
+        const tApi = logger.startTimer();
         const rating = await getImdbRating(imdbId, type);
+        logger.logDebug('Meta', `🎬 IMDb rating fetched for ${imdbId}: ${rating} (${logger.endTimer(tApi)}ms)`);
         if (ramImdbCache) {
             await ramImdbCache.set(imdbId, rating);
+            logger.logCacheSet('ram', `imdb:${imdbId}`, 'default');
         }
         return rating;
     } catch (err) {
-        console.error(`Error fetching IMDb rating for ${imdbId}:`, err.message);
+        logger.logError('Meta', `Error fetching IMDb rating for ${imdbId}: ${err.message}`);
         return null;
     }
 }
@@ -166,6 +175,7 @@ const fetchMovieData = async (moviedb, tmdbId, language) => {
 };
 
 const buildMovieResponse = async (res, type, language, tmdbId, config = {}) => {
+    const tBuild = logger.startTimer();
     const {
         rpdbkey,
         rpdbMediaTypes,
@@ -183,18 +193,18 @@ const buildMovieResponse = async (res, type, language, tmdbId, config = {}) => {
         ? Utils.parseMediaImage(type, tmdbId, null, language, rpdbkey, "logo", rpdbMediaTypes, topposterskey, toppostersConfig)
         : getLogo(tmdbId, language, res.original_language, config);
 
-    const logo = await logoFetcher.catch(e => {
-        console.warn(`Error fetching logo for movie ${tmdbId}:`, e.message);
-        return null;
-    });
-
     const moviedb = getTmdbClient(config);
-    const [poster, imdbRatingRaw, collectionRaw] = await Promise.all([
+    // Run logo, poster, imdb rating, and collection fetches ALL in parallel
+    const [logo, poster, imdbRatingRaw, collectionRaw] = await Promise.all([
+        logoFetcher.catch(e => {
+            logger.logWarn('Meta', `Error fetching logo for movie ${tmdbId}: ${e.message}`);
+            return null;
+        }),
         Utils.parseMediaImage(type, tmdbId, res.poster_path, language, rpdbkey, "poster", rpdbMediaTypes, topposterskey, toppostersConfig),
         getCachedImdbRating(res.external_ids?.imdb_id, type),
         (res.belongs_to_collection && res.belongs_to_collection.id)
             ? fetchCollectionData(moviedb, res.belongs_to_collection.id, language, tmdbId).catch((e) => {
-                console.warn(`Error fetching collection data for movie ${tmdbId} and collection ${res.belongs_to_collection.id}:`, e.message);
+                logger.logWarn('Meta', `Error fetching collection data for movie ${tmdbId}: ${e.message}`);
                 return null;
             })
             : null
@@ -254,6 +264,7 @@ const buildMovieResponse = async (res, type, language, tmdbId, config = {}) => {
         }
     };
     if (hideInCinemaTag) delete response.imdb_id;
+    logger.logDebug('Meta', `🏗️ Build movie response for ${tmdbId} "${res.title}" (${logger.endTimer(tBuild)}ms)`);
     return response;
 };
 
@@ -272,6 +283,7 @@ const fetchTvData = async (moviedb, tmdbId, language) => {
 };
 
 const buildTvResponse = async (res, type, language, tmdbId, config = {}) => {
+    const tBuild = logger.startTimer();
     const {
         rpdbkey,
         rpdbMediaTypes,
@@ -292,22 +304,22 @@ const buildTvResponse = async (res, type, language, tmdbId, config = {}) => {
         ? Utils.parseMediaImage(type, tmdbId, null, language, rpdbkey, "logo", rpdbMediaTypes, topposterskey, toppostersConfig)
         : getTvLogo(res.external_ids?.tvdb_id, res.id, language, res.original_language, config);
 
-    const logo = await logoFetcher.catch(e => {
-        console.warn(`Error fetching logo for series ${tmdbId}:`, e.message);
-        return null;
-    });
-
     const moviedb = getTmdbClient(config);
-    const [poster, imdbRatingRaw, episodes, collectionRaw] = await Promise.all([
+    // Run logo, poster, imdb rating, episodes, and collection fetches ALL in parallel
+    const [logo, poster, imdbRatingRaw, episodes, collectionRaw] = await Promise.all([
+        logoFetcher.catch(e => {
+            logger.logWarn('Meta', `Error fetching logo for series ${tmdbId}: ${e.message}`);
+            return null;
+        }),
         Utils.parseMediaImage(type, tmdbId, res.poster_path, language, rpdbkey, "poster", rpdbMediaTypes, topposterskey, toppostersConfig),
         getCachedImdbRating(res.external_ids?.imdb_id, type),
         getEpisodes(language, tmdbId, res.external_ids?.imdb_id, res.seasons, config).catch(e => {
-            console.warn(`Error fetching episodes for series ${tmdbId}:`, e.message);
+            logger.logWarn('Meta', `Error fetching episodes for series ${tmdbId}: ${e.message}`);
             return [];
         }),
         (res.belongs_to_collection && res.belongs_to_collection.id)
             ? fetchCollectionData(moviedb, res.belongs_to_collection.id, language, tmdbId).catch((e) => {
-                console.warn(`Error fetching collection data for movie ${tmdbId} and collection ${res.belongs_to_collection.id}:`, e.message);
+                logger.logWarn('Meta', `Error fetching collection data for movie ${tmdbId}: ${e.message}`);
                 return null;
             })
             : null
@@ -379,17 +391,26 @@ const buildTvResponse = async (res, type, language, tmdbId, config = {}) => {
     //     );
     // }
 
+    logger.logDebug('Meta', `🏗️ Build TV response for ${tmdbId} "${res.name}" episodes=${(episodes || []).length} (${logger.endTimer(tBuild)}ms)`);
     return response;
 };
 
 // Main function
 async function getMeta(type, language, tmdbId, config = {}) {
+    const tTotal = logger.startTimer();
     const cacheKey = getCacheKey(type, language, tmdbId, config);
+    logger.logMetaRequest(type, tmdbId, language, 'getMeta');
+
     if (ramMetaCache) {
+        const tRam = logger.startTimer();
         const cachedData = await ramMetaCache.get(cacheKey);
         if (cachedData) {
+            const elapsed = logger.endTimer(tRam);
+            logger.logCacheHit('ram', `meta:${type}/${tmdbId}`, elapsed);
+            logger.logMetaResponse(type, tmdbId, logger.endTimer(tTotal), true);
             return Promise.resolve({ meta: cachedData });
         }
+        logger.logCacheMiss('ram', `meta:${type}/${tmdbId}`, logger.endTimer(tRam));
     }
 
     if (tmdbId === "no-content" || tmdbId === "0") {
@@ -413,12 +434,14 @@ async function getMeta(type, language, tmdbId, config = {}) {
         try {
             const moviedb = getTmdbClient(config);
             // First, fetch raw TMDB data with 404 handling
+            const tApi = logger.startTimer();
             const tmdbRes = (type === "movie")
                 ? await fetchMovieData(moviedb, tmdbId, language)
                 : await fetchTvData(moviedb, tmdbId, language);
+            logger.logDebug('Meta', `🌐 TMDB API ${type}/${tmdbId} (${logger.endTimer(tApi)}ms)`);
 
             if (!tmdbRes) {
-                console.warn(`TMDB ${type} not found: ${tmdbId} (${language})`);
+                logger.logWarn('Meta', `TMDB ${type} not found: ${tmdbId} (${language})`);
                 // Return empty meta on 404 instead of throwing
                 return { meta: {} };
             }
@@ -431,11 +454,13 @@ async function getMeta(type, language, tmdbId, config = {}) {
             // Cache and return in L1 RAM cache
             if (ramMetaCache) {
                 await ramMetaCache.set(cacheKey, meta);
+                logger.logCacheSet('ram', `meta:${type}/${tmdbId}`, 'default');
             }
+            logger.logMetaResponse(type, tmdbId, logger.endTimer(tTotal), false);
             return { meta };
         } catch (error) {
             // Log and return empty meta instead of throwing to avoid crashing the process
-            console.error(`Error in getMeta: ${error?.message || error}`);
+            logger.logError('Meta', `Error in getMeta ${type}/${tmdbId}: ${error?.message || error}`);
             return { meta: {} };
         }
     });
