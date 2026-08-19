@@ -16,20 +16,6 @@ export default function TopPosters() {
     const [isValid, setIsValid] = useState(false);
     const [isChecking, setIsChecking] = useState(false);
 
-    useEffect(() => {
-        setTempKey(topposterskey);
-        setTempConfig(toppostersConfig);
-        if (topposterskey) {
-            validateKey(topposterskey).then((valid) => {
-                if (valid) {
-                    setIsValid(true);
-                }
-            });
-        } else {
-            setIsValid(false);
-        }
-    }, [topposterskey, toppostersConfig]);
-
     const validateKey = async (key: string) => {
         if (!key) {
             setIsValid(false);
@@ -59,6 +45,20 @@ export default function TopPosters() {
             setIsChecking(false);
         }
     };
+
+    useEffect(() => {
+        setTempKey(topposterskey);
+        setTempConfig(toppostersConfig);
+        if (topposterskey) {
+            validateKey(topposterskey).then((valid) => {
+                if (valid) {
+                    setIsValid(true);
+                }
+            });
+        } else {
+            setIsValid(false);
+        }
+    }, [topposterskey, toppostersConfig]);
 
     const handleSave = () => {
         if (isValid) {

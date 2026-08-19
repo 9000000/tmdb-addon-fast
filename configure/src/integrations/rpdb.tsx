@@ -16,6 +16,40 @@ export default function RPDB() {
   const [isValid, setIsValid] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
+  const validateRPDBKey = async (key: string) => {
+    if (!key) {
+      setIsValid(false);
+      setError("");
+      return false;
+    }
+
+    setIsChecking(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `https://api.ratingposterdb.com/${key}/isValid`
+      );
+      const data = await response.text();
+
+      if (response.ok && data.includes("valid")) {
+        setIsValid(true);
+        setError("");
+        return true;
+      } else {
+        setIsValid(false);
+        setError("RPDB Key is invalid, please try again");
+        return false;
+      }
+    } catch {
+      setIsValid(false);
+      setError("Error validating RPDB key");
+      return false;
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   useEffect(() => {
     setTempKey(rpdbkey);
     setTempMediaTypes(rpdbMediaTypes);
@@ -29,36 +63,6 @@ export default function RPDB() {
       setIsValid(false);
     }
   }, [rpdbkey, rpdbMediaTypes]);
-
-  const validateRPDBKey = async (key: string) => {
-    if (!key) {
-      setIsValid(false);
-      setError("");
-      return false;
-    }
-
-    setIsChecking(true);
-    try {
-      const response = await fetch(`https://api.ratingposterdb.com/${key}/isValid`);
-      const data = await response.json();
-
-      if (!(data || {}).valid) {
-        setError("RPDB Key is invalid, please try again");
-        setIsValid(false);
-        return false;
-      }
-      setError("");
-      setIsValid(true);
-      return true;
-    } catch (e) {
-      console.error(e);
-      setError("Error validating RPDB key");
-      setIsValid(false);
-      return false;
-    } finally {
-      setIsChecking(false);
-    }
-  };
 
   const handleSave = () => {
     if (isValid) {

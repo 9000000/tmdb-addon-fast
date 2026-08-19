@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, ComponentType } from "react";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -8,14 +8,21 @@ interface IntegrationDialogProps {
   icon: string;
 }
 
+const integrationsMap: Record<string, ComponentType<unknown>> = {
+  gemini: lazy(() => import("../integrations/gemini")),
+  groq: lazy(() => import("../integrations/groq")),
+  mdblist: lazy(() => import("../integrations/mdblist")),
+  rpdb: lazy(() => import("../integrations/rpdb")),
+  streaming: lazy(() => import("../integrations/streaming")),
+  tmdb: lazy(() => import("../integrations/tmdb")),
+  topposters: lazy(() => import("../integrations/topposters")),
+  trakt: lazy(() => import("../integrations/trakt")),
+};
+
+const DefaultIntegration = lazy(() => import("./DefaultIntegration"));
+
 export function IntegrationDialog({ id, name, icon }: IntegrationDialogProps) {
-  const IntegrationComponent = lazy(() => 
-    /* @vite-ignore */
-    import(`../integrations/${id}.tsx`).catch(() => {
-      console.error(`Failed to load integration component for ${id}`);
-      return import("./DefaultIntegration");
-    })
-  );
+  const IntegrationComponent = integrationsMap[id] || DefaultIntegration;
 
   return (
     <>
