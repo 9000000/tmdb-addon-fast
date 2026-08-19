@@ -4,7 +4,7 @@
  */
 require("dotenv").config();
 const { getTmdbClient } = require("../utils/getTmdbClient");
-const { cache } = require("./getCache");
+const { cacheWrap } = require("./getCache");
 
 const RELEASE_KEY_PREFIX = 'tmdb-addon|release';
 const RELEASE_TTL = 6 * 60 * 60; // 6 hours in seconds
@@ -18,37 +18,16 @@ const RELEASE_TTL = 6 * 60 * 60; // 6 hours in seconds
 async function getReleaseDates(movieId, config = {}) {
     const cacheKey = `${RELEASE_KEY_PREFIX}:${movieId}`;
 
-    // Try to get from cache first
-    if (cache) {
+    return await cacheWrap(cacheKey, async () => {
         try {
-            const cached = await cache.get(cacheKey);
-            if (cached) {
-                return cached;
-            }
+            const moviedb = getTmdbClient(config);
+            const releaseDates = await moviedb.movieReleaseDates({ id: movieId });
+            return releaseDates || null;
         } catch (error) {
-            console.error(`Cache get error for ${cacheKey}:`, error.message);
+            console.error(`Error fetching release dates for movie ${movieId}:`, error.message);
+            return null;
         }
-    }
-
-    // Fetch from API
-    try {
-        const moviedb = getTmdbClient(config);
-        const releaseDates = await moviedb.movieReleaseDates({ id: movieId });
-
-        // Store in cache
-        if (cache && releaseDates) {
-            try {
-                await cache.set(cacheKey, releaseDates, { ttl: RELEASE_TTL });
-            } catch (error) {
-                console.error(`Cache set error for ${cacheKey}:`, error.message);
-            }
-        }
-
-        return releaseDates;
-    } catch (error) {
-        console.error(`Error fetching release dates for movie ${movieId}:`, error.message);
-        return null;
-    }
+    }, RELEASE_TTL);
 }
 
 /**

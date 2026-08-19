@@ -1,7 +1,16 @@
-const { cache, redisInstance, ramUserCounterCache } = require('../lib/getCache');
+const { redisInstance, ramUserCounterCache } = require('../lib/getCache');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
+
+// Helper: Timeout protection for Redis
+function withTimeout(promise, ms, fallbackValue) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallbackValue), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
 
 // Chave base para armazenamento
 const USER_COUNT_KEY = 'tmdb-addon:unique-users';
@@ -76,11 +85,10 @@ async function trackUser(req) {
   const key = `${USER_IPS_KEY}:${today}:${ipHash}`;
   
   try {
-    if (cache) {
-      // Usa cache (Redis ou memory)
-      const exists = await cache.get(key);
+    if (redisInstance) {
+      const exists = await withTimeout(redisInstance.get(key), 1000, null);
       if (!exists) {
-        await cache.set(key, '1', { ttl: 24 * 60 * 60 }); // 24 horas
+        await withTimeout(redisInstance.set(key, '1', 'EX', 24 * 60 * 60), 1000, null);
         await incrementUserCount();
         return true;
       }
@@ -90,7 +98,7 @@ async function trackUser(req) {
       
       if (!existing) {
         if (ramUserCounterCache) {
-          await ramUserCounterCache.set(key, '1', { ttl: 24 * 60 * 60 }); // 24 horas
+          await ramUserCounterCache.set(key, '1', 24 * 60 * 60 * 1000); // 24 horas
         }
         await incrementUserCount();
         return true;
@@ -108,16 +116,12 @@ async function trackUser(req) {
  */
 async function incrementUserCount() {
   try {
-    if (cache) {
-      const current = await cache.get(USER_COUNT_KEY) || '0';
-      const newCount = parseInt(current) + 1;
-      await cache.set(USER_COUNT_KEY, String(newCount), { ttl: 365 * 24 * 60 * 60 }); // 1 ano
-    } else {
-      const currentRaw = ramUserCounterCache ? await ramUserCounterCache.get(USER_COUNT_KEY) : '0';
+    if (redisInstance) {
+      await withTimeout(redisInstance.incr(USER_COUNT_KEY), 1000, null);
+    } else if (ramUserCounterCache) {
+      const currentRaw = await ramUserCounterCache.get(USER_COUNT_KEY);
       const current = parseInt(currentRaw || '0', 10) || 0;
-      if (ramUserCounterCache) {
-        await ramUserCounterCache.set(USER_COUNT_KEY, String(current + 1), { ttl: 365 * 24 * 60 * 60 }); // 1 ano
-      }
+      await ramUserCounterCache.set(USER_COUNT_KEY, String(current + 1), 365 * 24 * 60 * 60 * 1000);
     }
   } catch (error) {
     console.error('Error incrementing user count:', error);
@@ -129,13 +133,14 @@ async function incrementUserCount() {
  */
 async function getUserCount() {
   try {
-    if (cache) {
-      const count = await cache.get(USER_COUNT_KEY);
-      return parseInt(count || '0');
-    } else {
-      const count = ramUserCounterCache ? await ramUserCounterCache.get(USER_COUNT_KEY) : '0';
+    if (redisInstance) {
+      const count = await withTimeout(redisInstance.get(USER_COUNT_KEY), 1000, '0');
+      return parseInt(count || '0', 10) || 0;
+    } else if (ramUserCounterCache) {
+      const count = await ramUserCounterCache.get(USER_COUNT_KEY);
       return parseInt(count || '0', 10) || 0;
     }
+    return 0;
   } catch (error) {
     console.error('Error getting user count:', error);
     return 0;
@@ -155,37 +160,28 @@ async function trackExternalUsers(count, instanceId) {
     const instanceCountKey = `${USER_COUNT_KEY}:external-count:${instanceId}`;
     const activeInstancesKey = `${USER_COUNT_KEY}:active-instances`;
     
-    if (cache) {
-      // Armazena o count diário por instância
-      await cache.set(dailyKey, String(count), { ttl: 7 * 24 * 60 * 60 }); // 7 dias
+    if (redisInstance) {
+      await withTimeout(redisInstance.set(dailyKey, String(count), 'EX', 7 * 24 * 60 * 60), 1000, null);
+      await withTimeout(redisInstance.set(instanceCountKey, String(count), 'EX', 2 * 24 * 60 * 60), 1000, null);
       
-      // Armazena o count mais recente da instância (para agregação rápida)
-      await cache.set(instanceCountKey, String(count), { ttl: 2 * 24 * 60 * 60 }); // 2 dias
-      
-      // Adiciona a instância à lista de instâncias ativas
-      // Usa um SET do Redis se disponível, senão usa uma lista simples
       try {
-        if (redisInstance && typeof redisInstance.sadd === 'function') {
-          // Se temos acesso direto ao Redis, usa SET
-          await redisInstance.sadd(activeInstancesKey, instanceId);
-          await redisInstance.expire(activeInstancesKey, 2 * 24 * 60 * 60); // 2 dias
+        if (typeof redisInstance.sadd === 'function') {
+          await withTimeout(redisInstance.sadd(activeInstancesKey, instanceId), 1000, null);
+          await withTimeout(redisInstance.expire(activeInstancesKey, 2 * 24 * 60 * 60), 1000, null);
         }
       } catch (e) {
-        // Se não conseguir usar SET, continua sem erro
+        // Ignore set errors
       }
-    } else {
-      if (ramUserCounterCache) {
-        await ramUserCounterCache.set(dailyKey, String(count), { ttl: 7 * 24 * 60 * 60 }); // 7 dias
-        await ramUserCounterCache.set(instanceCountKey, String(count), { ttl: 2 * 24 * 60 * 60 }); // 2 dias
+    } else if (ramUserCounterCache) {
+      await ramUserCounterCache.set(dailyKey, String(count), 7 * 24 * 60 * 60 * 1000);
+      await ramUserCounterCache.set(instanceCountKey, String(count), 2 * 24 * 60 * 60 * 1000);
 
-        // Para cache em memória, mantém lista de instâncias ativas
-        const activeInstances = await ramUserCounterCache.get(activeInstancesKey);
-        const instanceList = Array.isArray(activeInstances) ? activeInstances : [];
-        if (!instanceList.includes(instanceId)) {
-          instanceList.push(instanceId);
-        }
-        await ramUserCounterCache.set(activeInstancesKey, instanceList, { ttl: 2 * 24 * 60 * 60 }); // 2 dias
+      const activeInstances = await ramUserCounterCache.get(activeInstancesKey);
+      const instanceList = Array.isArray(activeInstances) ? activeInstances : [];
+      if (!instanceList.includes(instanceId)) {
+        instanceList.push(instanceId);
       }
+      await ramUserCounterCache.set(activeInstancesKey, instanceList, 2 * 24 * 60 * 60 * 1000);
     }
   } catch (error) {
     console.error('Error tracking external users:', error);
@@ -199,61 +195,50 @@ async function getAggregatedUserCount() {
   try {
     const baseCount = await getUserCount();
     
-    // Se é a instância oficial, agrega os counts de outras instâncias
     if (isOfficialInstance()) {
       let aggregatedCount = baseCount;
       
       try {
         if (redisInstance && typeof redisInstance.smembers === 'function') {
-          // Usa Redis SET para buscar todas as instâncias ativas
           const activeInstancesKey = `${USER_COUNT_KEY}:active-instances`;
-          const instanceIds = await redisInstance.smembers(activeInstancesKey);
+          const instanceIds = await withTimeout(redisInstance.smembers(activeInstancesKey), 1000, []);
           
-          // Busca o count de cada instância ativa
           for (const instanceId of instanceIds) {
             try {
               const instanceCountKey = `${USER_COUNT_KEY}:external-count:${instanceId}`;
-              const count = await cache.get(instanceCountKey);
+              const count = await withTimeout(redisInstance.get(instanceCountKey), 1000, null);
               if (count) {
-                aggregatedCount += parseInt(count || '0');
+                aggregatedCount += parseInt(count || '0', 10);
               }
             } catch (e) {
-              // Ignora erros individuais e continua
+              // Ignore individual errors
             }
           }
-        } else if (cache) {
-          // Para cache em memória ou cache-manager sem acesso direto ao Redis
-          // Tenta buscar instâncias conhecidas (limitado, mas funciona)
-          // Nota: sem acesso direto ao Redis, não podemos listar todas as chaves
-          // Então retornamos apenas o count local
-        } else {
-          // Cache em memória local
+        } else if (ramUserCounterCache) {
           const activeInstancesKey = `${USER_COUNT_KEY}:active-instances`;
-          const instanceList = ramUserCounterCache ? await ramUserCounterCache.get(activeInstancesKey) : null;
+          const instanceList = await ramUserCounterCache.get(activeInstancesKey);
           
           if (Array.isArray(instanceList)) {
             for (const instanceId of instanceList) {
               try {
                 const instanceCountKey = `${USER_COUNT_KEY}:external-count:${instanceId}`;
-                const count = ramUserCounterCache ? await ramUserCounterCache.get(instanceCountKey) : null;
+                const count = await ramUserCounterCache.get(instanceCountKey);
                 if (count) {
-                  aggregatedCount += parseInt(count || '0');
+                  aggregatedCount += parseInt(count || '0', 10);
                 }
               } catch (e) {
-                // Ignora erros individuais
+                // Ignore individual errors
               }
             }
           }
         }
       } catch (error) {
-        // Se falhar, retorna apenas o count local
         console.error('Error aggregating external counts:', error);
       }
       
       return aggregatedCount;
     }
     
-    // Para instâncias não oficiais, retorna apenas o count local
     return baseCount;
   } catch (error) {
     console.error('Error getting aggregated user count:', error);
@@ -266,12 +251,10 @@ async function getAggregatedUserCount() {
  */
 async function resetUserCount() {
   try {
-    if (cache) {
-      await cache.del(USER_COUNT_KEY);
-    } else {
-      if (ramUserCounterCache) {
-        await ramUserCounterCache.del(USER_COUNT_KEY);
-      }
+    if (redisInstance) {
+      await withTimeout(redisInstance.del(USER_COUNT_KEY), 1000, null);
+    } else if (ramUserCounterCache) {
+      await ramUserCounterCache.del(USER_COUNT_KEY);
     }
   } catch (error) {
     console.error('Error resetting user count:', error);

@@ -1,6 +1,15 @@
 const axios = require('axios');
-const { cache } = require("../lib/getCache");
+const { redisInstance } = require("../lib/getCache");
 const diferentOrder = require("../static/diferentOrder.json");
+
+// Helper: Timeout protection for Redis
+function withTimeout(promise, ms, fallbackValue) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallbackValue), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
 
 const CHECK_INTERVAL_DAYS = 7; // You can adjust as needed
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -9,13 +18,22 @@ const GITHUB_REPO = process.env.GITHUB_REPO; // Ex: 'mrcanelas/tmdb-addon'
 const client = axios.create({ timeout: 10000 });
 
 async function getLastChecked(tmdbId) {
-  if (!cache) return null;
-  return await cache.get(`lastChecked:${tmdbId}`);
+  if (!redisInstance) return null;
+  try {
+    const data = await withTimeout(redisInstance.get(`lastChecked:${tmdbId}`), 1000, null);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 async function setLastChecked(tmdbId, data) {
-  if (!cache) return;
-  await cache.set(`lastChecked:${tmdbId}`, data, { ttl: 365 * 24 * 60 * 60 });
+  if (!redisInstance) return;
+  try {
+    await withTimeout(redisInstance.set(`lastChecked:${tmdbId}`, JSON.stringify(data), 'EX', 365 * 24 * 60 * 60), 1000, null);
+  } catch (e) {
+    // Ignore error
+  }
 }
 
 async function openGithubIssue(title, body, labels = []) {

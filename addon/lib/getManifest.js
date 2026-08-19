@@ -263,7 +263,7 @@ async function getManifest(config, req) {
     description: "Stremio addon that provides rich metadata for movies and TV shows from TMDB, featuring customizable catalogs, multi-language support, favorites lists, watchlist, ratings, and IMDb integration. Current settings: " + activeConfigs,
     resources: ["catalog", "meta"],
     types: ["movie", "series"],
-    idPrefixes: provideImdbId ? ["tmdb:", "tt"] : ["tmdb:"],
+    idPrefixes: provideImdbId || returnImdbId ? ["tmdb:", "tt"] : ["tmdb:"],
     stremioAddonsConfig,
     behaviorHints: {
       configurable: true,

@@ -1,24 +1,32 @@
 require('dotenv').config()
 const { getTmdbClient } = require('../utils/getTmdbClient')
 
+const { ramImdbCache } = require('./getCache');
+
 async function getTmdb(type, imdbId, config = {}) {
+  if (!imdbId) return null;
+  const cacheKey = `imdb:${type}:${imdbId}`;
+  
+  if (ramImdbCache) {
+    const cached = await ramImdbCache.get(cacheKey);
+    if (cached) return cached;
+  }
+
   try {
     const moviedb = getTmdbClient(config);
+    let tmdbId = null;
     if (type === "movie") {
-      const tmdbId = await moviedb
-        .find({ id: imdbId, external_source: 'imdb_id' })
-        .then((res) => {
-          return res.movie_results[0] ? res.movie_results[0].id : null;
-        });
-      return tmdbId;
+      const res = await moviedb.find({ id: imdbId, external_source: 'imdb_id' });
+      tmdbId = res.movie_results[0] ? res.movie_results[0].id : null;
     } else {
-      const tmdbId = await moviedb
-        .find({ id: imdbId, external_source: 'imdb_id' })
-        .then((res) => {
-          return res.tv_results[0] ? res.tv_results[0].id : null;
-        });
-      return tmdbId;
+      const res = await moviedb.find({ id: imdbId, external_source: 'imdb_id' });
+      tmdbId = res.tv_results[0] ? res.tv_results[0].id : null;
     }
+
+    if (tmdbId && ramImdbCache) {
+      await ramImdbCache.set(cacheKey, tmdbId);
+    }
+    return tmdbId;
   } catch (err) {
     if (err.message !== "TMDB_API_KEY_MISSING" && err.message !== "TMDB_API_KEY_INVALID") {
       console.error(`Error in getTmdb conversion for ${imdbId}:`, err.message);

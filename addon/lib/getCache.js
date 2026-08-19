@@ -92,6 +92,15 @@ function getRedisClient() {
   return redisInstance;
 }
 
+// Helper: Timeout protection for async operations
+function withTimeout(promise, ms, fallbackValue) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(fallbackValue), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
 // Khởi tạo cache-manager chính đồng bộ (v7)
 function initiateCache() {
   if (NO_CACHE) {
@@ -102,11 +111,11 @@ function initiateCache() {
   const redisClient = getRedisClient();
 
   if (redisClient) {
-    console.log('[Cache] Creating Redis Custom Store for cache-manager v7...');
+    console.log('[Cache] Creating Redis Custom Store for cache-manager v7 with timeout protection...');
     const redisStore = {
       async get(key, options) {
         try {
-          const val = await redisClient.get(key);
+          const val = await withTimeout(redisClient.get(key), 1500, null);
           if (!val) return undefined;
 
           const parsed = JSON.parse(val);
@@ -137,18 +146,18 @@ function initiateCache() {
           const expires = Date.now() + msTTL;
           const payload = JSON.stringify({ value, expires });
 
-          if (msTTL > 0) {
-            await redisClient.set(key, payload, 'PX', msTTL);
-          } else {
-            await redisClient.set(key, payload);
-          }
+          const setPromise = msTTL > 0
+            ? redisClient.set(key, payload, 'PX', msTTL)
+            : redisClient.set(key, payload);
+
+          await withTimeout(setPromise, 1500, null);
         } catch (err) {
           console.error('[Redis Store] Error setting key:', key, err.message);
         }
       },
       async delete(key) {
         try {
-          await redisClient.del(key);
+          await withTimeout(redisClient.del(key), 1500, null);
         } catch (err) {
           console.error('[Redis Store] Error deleting key:', key, err.message);
         }
