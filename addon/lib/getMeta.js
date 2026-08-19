@@ -411,7 +411,7 @@ async function getMeta(type, language, tmdbId, config = {}) {
         };
     }
 
-    return cacheWrapMeta(`${type}:${language}:${tmdbId}:${config.rpdbkey || ''}`, async () => {
+    const result = await cacheWrapMeta(getCacheKey(type, language, tmdbId, config), async () => {
         try {
             const moviedb = getTmdbClient(config);
             // First, fetch raw TMDB data with 404 handling
@@ -442,6 +442,16 @@ async function getMeta(type, language, tmdbId, config = {}) {
             return { meta: {} };
         }
     });
+
+    // Warm up RAM cache if persistent cache hit (ramMetaCache was empty at start)
+    if (ramMetaCache && result?.meta && Object.keys(result.meta).length > 0) {
+        const stillEmpty = !(await ramMetaCache.get(cacheKey));
+        if (stillEmpty) {
+            await ramMetaCache.set(cacheKey, result.meta);
+        }
+    }
+
+    return result;
 }
 
 module.exports = { getMeta };
