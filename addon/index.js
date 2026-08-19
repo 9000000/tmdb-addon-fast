@@ -41,7 +41,9 @@ const staticOptions = {
 const distFolderName = 'dist';
 const publicFolderName = 'public';
 addon.use(express.static(path.join(__dirname, '..', publicFolderName), staticOptions));
+// Serve dist assets at root AND at /configure prefix (Vite builds with base: '/configure/')
 addon.use(express.static(path.join(__dirname, '..', distFolderName), staticOptions));
+addon.use('/configure', express.static(path.join(__dirname, '..', distFolderName), staticOptions));
 
 const getCacheHeaders = function (opts) {
   opts = opts || {};
@@ -74,7 +76,12 @@ const respond = function (res, data, opts) {
 };
 
 addon.get("/", function (_, res) {
-  res.redirect("/configure");
+  res.redirect("/configure/");
+});
+
+// Serve SPA (React app) for /configure and all sub-routes
+addon.get(["/configure", "/configure/{*path}"], function (req, res) {
+  res.sendFile(path.join(__dirname, '..', distFolderName, 'index.html'));
 });
 
 addon.get("/request_token", async function (req, res) {
