@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 export default function TMDB() {
-  const { sessionId, setSessionId, saveConfigToStorage } = useConfig();
+  const { sessionId, setSessionId, tmdbApiKey } = useConfig();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const popupCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -19,7 +19,12 @@ export default function TMDB() {
         throw new Error('Invalid request token');
       }
       
-      const response = await fetch(`/session_id?request_token=${encodeURIComponent(requestToken)}`);
+      const params = new URLSearchParams({ request_token: requestToken });
+      if (tmdbApiKey) {
+        params.append('api_key', tmdbApiKey);
+      }
+
+      const response = await fetch(`/session_id?${params.toString()}`);
       
       if (!response.ok) {
         let errorMessage = 'Failed to create session';
@@ -59,7 +64,7 @@ export default function TMDB() {
     } finally {
       setIsLoading(false);
     }
-  }, [setSessionId]);
+  }, [setSessionId, tmdbApiKey]);
 
   useEffect(() => {
     // Escuta mensagens do popup OAuth
@@ -108,7 +113,11 @@ export default function TMDB() {
 
     try {
       const uuid = crypto.randomUUID();
-      const response = await fetch(`/request_token?cache_buster=${uuid}`);
+      const params = new URLSearchParams({ cache_buster: uuid });
+      if (tmdbApiKey) {
+        params.append('api_key', tmdbApiKey);
+      }
+      const response = await fetch(`/request_token?${params.toString()}`);
       
       if (!response.ok) {
         let errorMessage = 'Failed to get request token';

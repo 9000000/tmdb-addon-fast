@@ -76,7 +76,8 @@ addon.get("/", function (_, res) {
 
 addon.get("/request_token", async function (req, res) {
   try {
-    const response = await getRequestToken()
+    const apiKey = req.query.api_key || req.query.tmdbApiKey || req.query.apiKey;
+    const response = await getRequestToken(apiKey);
 
     // Verifica se houve erro na requisição
     if (response?.success === false) {
@@ -101,13 +102,14 @@ addon.get("/request_token", async function (req, res) {
 addon.get("/session_id", async function (req, res) {
   try {
     const requestToken = req.query.request_token;
+    const apiKey = req.query.api_key || req.query.tmdbApiKey || req.query.apiKey;
 
     if (!requestToken) {
       res.status(400).json({ error: 'Request token is required' });
       return;
     }
 
-    const response = await getSessionId(requestToken);
+    const response = await getSessionId(requestToken, apiKey);
 
     // Verifica se houve erro na requisição
     if (response?.success === false) {
