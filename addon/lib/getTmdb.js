@@ -9,10 +9,14 @@ async function getTmdb(type, imdbId, config = {}) {
   
   if (ramImdbCache) {
     const cached = await ramImdbCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached) {
+      console.log(`[getTmdb] RAM HIT: ${imdbId} -> tmdbId=${cached}`);
+      return cached;
+    }
   }
 
   try {
+    const t0 = Date.now();
     const moviedb = getTmdbClient(config);
     let tmdbId = null;
     if (type === "movie") {
@@ -23,13 +27,15 @@ async function getTmdb(type, imdbId, config = {}) {
       tmdbId = res.tv_results[0] ? res.tv_results[0].id : null;
     }
 
+    console.log(`[getTmdb] API LOOKUP: ${imdbId} -> tmdbId=${tmdbId} (${Date.now() - t0}ms)`);
+
     if (tmdbId && ramImdbCache) {
       await ramImdbCache.set(cacheKey, tmdbId);
     }
     return tmdbId;
   } catch (err) {
     if (err.message !== "TMDB_API_KEY_MISSING" && err.message !== "TMDB_API_KEY_INVALID") {
-      console.error(`Error in getTmdb conversion for ${imdbId}:`, err.message);
+      console.error(`[getTmdb] ERROR: ${imdbId} err=${err.message}`);
     }
     return null;
   }

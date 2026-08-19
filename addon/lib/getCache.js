@@ -2,6 +2,30 @@ const { createCache } = require('cache-manager');
 const Redis = require('ioredis');
 
 const GLOBAL_KEY_PREFIX = 'tmdb-addon';
+
+// Cache logging verbosity: 'verbose' = log every hit/miss, 'summary' = periodic stats, 'off' = silent
+const CACHE_LOG_LEVEL = (process.env.CACHE_LOG_LEVEL || 'verbose').toLowerCase();
+const isVerbose = CACHE_LOG_LEVEL === 'verbose';
+const isSummary = CACHE_LOG_LEVEL === 'summary' || isVerbose;
+
+// Stats counters for summary mode
+const cacheStats = {
+  redisHit: 0, redisMiss: 0, redisError: 0,
+  wrapHit: 0, wrapMiss: 0, wrapError: 0,
+  redisSetOk: 0, redisSetFail: 0,
+  timeoutCount: 0,
+  startTime: Date.now()
+};
+
+// Print cache stats every 60 seconds when summary mode is on
+if (isSummary) {
+  setInterval(() => {
+    const uptime = ((Date.now() - cacheStats.startTime) / 1000).toFixed(0);
+    const total = cacheStats.wrapHit + cacheStats.wrapMiss;
+    const hitRate = total > 0 ? ((cacheStats.wrapHit / total) * 100).toFixed(1) : '0.0';
+    console.log(`[Cache Stats] uptime=${uptime}s | wrap: hit=${cacheStats.wrapHit} miss=${cacheStats.wrapMiss} err=${cacheStats.wrapError} hitRate=${hitRate}% | redis: hit=${cacheStats.redisHit} miss=${cacheStats.redisMiss} err=${cacheStats.redisError} set=${cacheStats.redisSetOk} setFail=${cacheStats.redisSetFail} | timeouts=${cacheStats.timeoutCount}`);
+  }, 60_000).unref();
+}
 const META_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|meta`;
 const CATALOG_KEY_PREFIX = `${GLOBAL_KEY_PREFIX}|catalog`;
 
@@ -100,10 +124,16 @@ function getRedisClient() {
 }
 
 // Helper: Timeout protection for async operations
-function withTimeout(promise, ms, fallbackValue) {
+function withTimeout(promise, ms, fallbackValue, label = '') {
   let timer;
+  let timedOut = false;
   const timeoutPromise = new Promise((resolve) => {
-    timer = setTimeout(() => resolve(fallbackValue), ms);
+    timer = setTimeout(() => {
+      timedOut = true;
+      cacheStats.timeoutCount++;
+      console.warn(`[Cache Timeout] ${label} exceeded ${ms}ms, returning fallback`);
+      resolve(fallbackValue);
+    }, ms);
   });
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
 }
@@ -121,9 +151,19 @@ function initiateCache() {
     console.log('[Cache] Creating Redis Custom Store for cache-manager v7 with timeout protection...');
     const redisStore = {
       async get(key, options) {
+        const t0 = Date.now();
         try {
-          const val = await withTimeout(redisClient.get(key), 1500, null);
-          if (!val) return undefined;
+          const val = await withTimeout(redisClient.get(key), 1500, null, `GET ${key}`);
+          const latency = Date.now() - t0;
+
+          if (!val) {
+            cacheStats.redisMiss++;
+            if (isVerbose) console.log(`[Redis GET] MISS key=${key} latency=${latency}ms`);
+            return undefined;
+          }
+
+          cacheStats.redisHit++;
+          if (isVerbose) console.log(`[Redis GET] HIT key=${key} latency=${latency}ms size=${val.length}B`);
 
           const parsed = JSON.parse(val);
           // Check if value is wrapped with { value, expires } for cache-manager wrap compat
@@ -136,11 +176,13 @@ function initiateCache() {
           }
           return value;
         } catch (err) {
-          console.error('[Redis Store] Error getting key:', key, err.message);
+          cacheStats.redisError++;
+          console.error(`[Redis GET] ERROR key=${key} latency=${Date.now() - t0}ms err=${err.message}`);
           return undefined;
         }
       },
       async set(key, value, ttl) {
+        const t0 = Date.now();
         try {
           // Normalize TTL from wrap (ms as number) or direct call (object like { ttl: seconds })
           let msTTL = META_TTL;
@@ -157,9 +199,12 @@ function initiateCache() {
             ? redisClient.set(key, payload, 'PX', msTTL)
             : redisClient.set(key, payload);
 
-          await withTimeout(setPromise, 1500, null);
+          await withTimeout(setPromise, 1500, null, `SET ${key}`);
+          cacheStats.redisSetOk++;
+          if (isVerbose) console.log(`[Redis SET] OK key=${key} ttl=${(msTTL / 1000).toFixed(0)}s size=${payload.length}B latency=${Date.now() - t0}ms`);
         } catch (err) {
-          console.error('[Redis Store] Error setting key:', key, err.message);
+          cacheStats.redisSetFail++;
+          console.error(`[Redis SET] ERROR key=${key} latency=${Date.now() - t0}ms err=${err.message}`);
         }
       },
       async delete(key) {
@@ -186,15 +231,38 @@ const cacheInstance = initiateCache();
 // Wrapper toàn cục tự động convert giây -> ms cho cache-manager v7
 async function cacheWrapGlobal(key, method, ttl) {
   if (NO_CACHE) {
+    if (isVerbose) console.log(`[CacheWrap] SKIP (NO_CACHE) key=${key}`);
     return method();
   }
 
   if (cacheInstance) {
+    const t0 = Date.now();
     try {
       const msTTL = ttl ? ttl * 1000 : undefined;
-      return await cacheInstance.wrap(key, method, msTTL);
+
+      // We need to detect cache hit vs miss.
+      // Wrap calls the method only on miss, so we track it via a flag.
+      let wasMiss = false;
+      const wrappedMethod = async () => {
+        wasMiss = true;
+        return method();
+      };
+
+      const result = await cacheInstance.wrap(key, wrappedMethod, msTTL);
+      const latency = Date.now() - t0;
+
+      if (wasMiss) {
+        cacheStats.wrapMiss++;
+        if (isVerbose) console.log(`[CacheWrap] MISS key=${key} latency=${latency}ms (fetched from source)`);
+      } else {
+        cacheStats.wrapHit++;
+        if (isVerbose) console.log(`[CacheWrap] HIT key=${key} latency=${latency}ms`);
+      }
+
+      return result;
     } catch (error) {
-      console.warn(`[Cache] Error for ${key}, falling back to Method:`, error.message);
+      cacheStats.wrapError++;
+      console.warn(`[CacheWrap] ERROR key=${key} latency=${Date.now() - t0}ms err=${error.message}, falling back to Method`);
     }
   }
 

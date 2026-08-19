@@ -92,16 +92,21 @@ async function getCachedImdbRating(imdbId, type) {
     if (!imdbId) return null;
     if (ramImdbCache) {
         const cached = await ramImdbCache.get(imdbId);
-        if (cached) return cached;
+        if (cached) {
+            console.log(`[Meta] IMDb rating RAM HIT: ${imdbId}`);
+            return cached;
+        }
     }
     try {
+        const t0 = Date.now();
         const rating = await getImdbRating(imdbId, type);
+        console.log(`[Meta] IMDb rating FETCHED: ${imdbId} = ${rating} (${Date.now() - t0}ms)`);
         if (ramImdbCache) {
             await ramImdbCache.set(imdbId, rating);
         }
         return rating;
     } catch (err) {
-        console.error(`Error fetching IMDb rating for ${imdbId}:`, err.message);
+        console.error(`[Meta] IMDb rating ERROR: ${imdbId} err=${err.message}`);
         return null;
     }
 }
@@ -386,12 +391,17 @@ const buildTvResponse = async (res, type, language, tmdbId, config = {}) => {
 
 // Main function
 async function getMeta(type, language, tmdbId, config = {}) {
+    const metaT0 = Date.now();
     const cacheKey = getCacheKey(type, language, tmdbId, config);
+
+    // L1: RAM cache check
     if (ramMetaCache) {
         const cachedData = await ramMetaCache.get(cacheKey);
         if (cachedData && typeof cachedData === 'object' && Object.keys(cachedData).length > 0) {
+            console.log(`[Meta] RAM HIT type=${type} tmdbId=${tmdbId} lang=${language} latency=${Date.now() - metaT0}ms`);
             return Promise.resolve({ meta: cachedData });
         }
+        console.log(`[Meta] RAM MISS type=${type} tmdbId=${tmdbId} lang=${language}`);
     }
 
     if (tmdbId === "no-content" || tmdbId === "0") {
@@ -413,29 +423,41 @@ async function getMeta(type, language, tmdbId, config = {}) {
 
     try {
         const result = await cacheWrapMeta(cacheKey, async () => {
+            console.log(`[Meta] FETCH START type=${type} tmdbId=${tmdbId} lang=${language}`);
+            const fetchT0 = Date.now();
             const moviedb = getTmdbClient(config);
             // First, fetch raw TMDB data with 404 handling
             const tmdbRes = (type === "movie")
                 ? await fetchMovieData(moviedb, tmdbId, language)
                 : await fetchTvData(moviedb, tmdbId, language);
 
+            const fetchLatency = Date.now() - fetchT0;
+
             if (!tmdbRes) {
-                console.warn(`TMDB ${type} not found: ${tmdbId} (${language})`);
+                console.warn(`[Meta] TMDB 404: type=${type} tmdbId=${tmdbId} lang=${language} fetchTime=${fetchLatency}ms`);
                 return { meta: {} };
             }
 
+            console.log(`[Meta] TMDB OK: type=${type} tmdbId=${tmdbId} title="${tmdbRes.title || tmdbRes.name}" fetchTime=${fetchLatency}ms`);
+
             // Build the meta object
+            const buildT0 = Date.now();
             const meta = (type === "movie")
                 ? await buildMovieResponse(tmdbRes, type, language, tmdbId, config)
                 : await buildTvResponse(tmdbRes, type, language, tmdbId, config);
+
+            const buildLatency = Date.now() - buildT0;
 
             if (!meta || Object.keys(meta).length === 0) {
                 throw new Error(`Empty meta built for ${tmdbId}`);
             }
 
+            console.log(`[Meta] BUILD OK: type=${type} tmdbId=${tmdbId} id=${meta.id} buildTime=${buildLatency}ms totalFetch=${Date.now() - fetchT0}ms`);
+
             // Save to L1 RAM Cache before returning
             if (ramMetaCache) {
                 await ramMetaCache.set(cacheKey, meta);
+                console.log(`[Meta] RAM SET: tmdbId=${tmdbId}`);
             }
 
             return { meta };
@@ -446,12 +468,14 @@ async function getMeta(type, language, tmdbId, config = {}) {
             const currentRam = await ramMetaCache.get(cacheKey);
             if (!currentRam) {
                 await ramMetaCache.set(cacheKey, result.meta);
+                console.log(`[Meta] RAM WARM-UP from Redis: tmdbId=${tmdbId}`);
             }
         }
 
+        console.log(`[Meta] DONE type=${type} tmdbId=${tmdbId} hasData=${!!(result?.meta?.id)} totalTime=${Date.now() - metaT0}ms`);
         return result || { meta: {} };
     } catch (error) {
-        console.error(`Error in getMeta for ${tmdbId}: ${error?.message || error}`);
+        console.error(`[Meta] ERROR type=${type} tmdbId=${tmdbId} totalTime=${Date.now() - metaT0}ms err=${error?.message || error}`);
         return { meta: {} };
     }
 }

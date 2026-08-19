@@ -249,6 +249,7 @@ const handleManifest = async function (req, res) {
 };
 
 const handleCatalog = async function (req, res) {
+  const routeT0 = Date.now();
   const { catalogChoices, type, id, extra } = req.params;
   const config = parseConfig(catalogChoices) || {};
   const language = config.language || DEFAULT_LANGUAGE;
@@ -260,6 +261,7 @@ const handleCatalog = async function (req, res) {
     : {};
   const page = Math.ceil(skip ? skip / 20 + 1 : undefined) || 1;
   let metas = [];
+  console.log(`[Route] CATALOG START type=${type} id=${id} lang=${language} page=${page} genre=${genre || 'none'}`);
   try {
     const args = [type, language, page];
 
@@ -306,6 +308,8 @@ const handleCatalog = async function (req, res) {
     res.status(404).send((e || {}).message || "Not found");
     return;
   }
+  const metaCount = metas?.metas?.length || 0;
+  console.log(`[Route] CATALOG DONE type=${type} id=${id} results=${metaCount} totalTime=${Date.now() - routeT0}ms`);
   const cacheOpts = {
     cacheMaxAge: 1 * 24 * 60 * 60,
     staleRevalidate: 7 * 24 * 60 * 60,
@@ -315,6 +319,7 @@ const handleCatalog = async function (req, res) {
 };
 
 const handleMeta = async function (req, res) {
+  const routeT0 = Date.now();
   const { catalogChoices, type, id } = req.params;
   const config = parseConfig(catalogChoices) || {};
   const tmdbId = id.split(":")[1];
@@ -322,6 +327,8 @@ const handleMeta = async function (req, res) {
   const imdbId = req.params.id.split(":")[0];
   delete config.catalogs;
   delete config.streaming;
+
+  console.log(`[Route] META START type=${type} id=${id} lang=${language}`);
 
   if (id.includes("tmdb:")) {
     if (!/^\d+$/.test(tmdbId)) {
@@ -341,6 +348,7 @@ const handleMeta = async function (req, res) {
         const hasEnded = !!((resp.releaseInfo || "").length > 5);
         cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
       }
+      console.log(`[Route] META DONE type=${type} tmdbId=${tmdbId} hasData=${!!(resp?.meta?.id)} totalTime=${Date.now() - routeT0}ms`);
       respond(res, resp, cacheOpts);
     } catch (e) {
       if (e.message === "TMDB_API_KEY_MISSING" || e.message === "TMDB_API_KEY_INVALID") {
@@ -353,16 +361,17 @@ const handleMeta = async function (req, res) {
       if (e.message && (e.message.includes("404") || e.message.toLowerCase().includes("not found"))) {
         res.status(404).json({ error: "Content not found on TMDB" });
       } else {
-        console.error(`Error in meta route for ${type} ${tmdbId}:`, e);
+        console.error(`[Route] META ERROR type=${type} tmdbId=${tmdbId} totalTime=${Date.now() - routeT0}ms err=${e}`);
         res.status(500).json({ error: "Internal server error" });
       }
     }
     return;
   } else if (id.includes("tt")) {
     try {
-      const tmdbId = await getTmdb(type, imdbId, config);
-      if (tmdbId) {
-        const resp = await getMeta(type, language, tmdbId, config);
+      console.log(`[Route] META IMDb LOOKUP: ${imdbId}`);
+      const resolvedTmdbId = await getTmdb(type, imdbId, config);
+      if (resolvedTmdbId) {
+        const resp = await getMeta(type, language, resolvedTmdbId, config);
         const cacheOpts = {
           staleRevalidate: 20 * 24 * 60 * 60,
           staleError: 30 * 24 * 60 * 60,
@@ -373,8 +382,10 @@ const handleMeta = async function (req, res) {
           const hasEnded = !!((resp.releaseInfo || "").length > 5);
           cacheOpts.cacheMaxAge = (hasEnded ? 14 : 1) * 24 * 60 * 60;
         }
+        console.log(`[Route] META DONE type=${type} imdb=${imdbId} -> tmdb=${resolvedTmdbId} hasData=${!!(resp?.meta?.id)} totalTime=${Date.now() - routeT0}ms`);
         respond(res, resp, cacheOpts);
       } else {
+        console.log(`[Route] META NOT FOUND imdb=${imdbId} totalTime=${Date.now() - routeT0}ms`);
         respond(res, { meta: {} });
       }
     } catch (e) {
@@ -388,7 +399,7 @@ const handleMeta = async function (req, res) {
       if (e.message && (e.message.includes("404") || e.message.toLowerCase().includes("not found"))) {
         res.status(404).json({ error: "Content not found on TMDB" });
       } else {
-        console.error(`Error in meta route for ${type} ${id}:`, e);
+        console.error(`[Route] META ERROR type=${type} id=${id} totalTime=${Date.now() - routeT0}ms err=${e}`);
         res.status(500).json({ error: "Internal server error" });
       }
     }
