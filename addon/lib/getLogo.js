@@ -74,104 +74,109 @@ function pickLogo(logos, language, originalLanguage) {
   return picked;
 }
 
+const { cacheWrap } = require('./getCache');
+const LOGO_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
+
 async function getLogo(tmdbId, language, originalLanguage, config = {}) {
-  try {
-    if (!tmdbId) {
-      throw new Error(`TMDB ID not available for logo: ${tmdbId}`);
+  if (!tmdbId) return '';
+  const cacheKey = `logo:movie:${tmdbId}:${language}`;
+
+  return await cacheWrap(cacheKey, async () => {
+    try {
+      const moviedb = getTmdbClient(config);
+      const [fanartRes, tmdbRes] = await Promise.all([
+        fanart
+          ? fanart
+              .getMovieImages(tmdbId)
+              .then(res => res.hdmovielogo || [])
+              .catch(() => [])
+          : Promise.resolve([]),
+
+        moviedb
+          .movieImages({ id: tmdbId })
+          .then(res => res.logos || [])
+          .catch(() => [])
+      ]);
+
+      const fanartLogos = fanartRes.map(l => ({
+        url: l.url,
+        lang: l.lang || 'en',
+        fanartLikes: l.likes || 0,
+        source: 'fanart'
+      }));
+
+      const tmdbLogos = tmdbRes.map(l => ({
+        url: `https://image.tmdb.org/t/p/original${l.file_path}`,
+        lang: `${l.iso_639_1}-${l.iso_3166_1}` || 'en',
+        tmdbVotes: l.vote_average || 0,
+        source: 'tmdb'
+      }));
+
+      const combined = [...fanartLogos, ...tmdbLogos];
+
+      if (combined.length === 0) return '';
+
+      const picked = pickLogo(combined, language, originalLanguage);
+      return picked?.url || '';
+    } catch (error) {
+      if (error.message !== "TMDB_API_KEY_MISSING" && error.message !== "TMDB_API_KEY_INVALID") {
+        console.error(`Error fetching logo for movie ${tmdbId}:`, error.message);
+      }
+      return '';
     }
-
-    const moviedb = getTmdbClient(config);
-    const [fanartRes, tmdbRes] = await Promise.all([
-      fanart
-        ? fanart
-            .getMovieImages(tmdbId)
-            .then(res => res.hdmovielogo || [])
-            .catch(() => [])
-        : Promise.resolve([]),
-
-      moviedb
-        .movieImages({ id: tmdbId })
-        .then(res => res.logos || [])
-        .catch(() => [])
-    ])
-
-    const fanartLogos = fanartRes.map(l => ({
-      url: l.url,
-      lang: l.lang || 'en',
-      fanartLikes: l.likes || 0,
-      source: 'fanart'
-    }));
-
-    const tmdbLogos = tmdbRes.map(l => ({
-      url: `https://image.tmdb.org/t/p/original${l.file_path}`,
-      lang: `${l.iso_639_1}-${l.iso_3166_1}` || 'en',
-      tmdbVotes: l.vote_average || 0,
-      source: 'tmdb'
-    }));
-
-    const combined = [...fanartLogos, ...tmdbLogos];
-
-    if (combined.length === 0) return '';
-
-    const picked = pickLogo(combined, language, originalLanguage);
-    return picked?.url || '';
-  } catch (error) {
-    if (error.message !== "TMDB_API_KEY_MISSING" && error.message !== "TMDB_API_KEY_INVALID") {
-      console.error(`Error fetching logo for movie ${tmdbId}:`, error.message);
-    }
-    return '';
-  }
+  }, LOGO_TTL);
 }
 
 async function getTvLogo(tvdb_id, tmdbId, language, originalLanguage, config = {}) {
-  try {
-    if (!tvdb_id && !tmdbId) {
-      throw new Error(`TVDB ID and TMDB ID not available for logos.`);
+  if (!tvdb_id && !tmdbId) return '';
+  const cacheKey = `logo:series:${tmdbId || tvdb_id}:${language}`;
+
+  return await cacheWrap(cacheKey, async () => {
+    try {
+      const moviedb = getTmdbClient(config);
+      const [fanartRes, tmdbRes] = await Promise.all([
+        (fanart && tvdb_id)
+          ? fanart
+            .getShowImages(tvdb_id)
+            .then(res => res.hdtvlogo || [])
+            .catch(() => [])
+          : Promise.resolve([]),
+
+        tmdbId
+          ? moviedb
+            .tvImages({ id: tmdbId })
+            .then(res => res.logos || [])
+            .catch(() => [])
+          : Promise.resolve([])
+      ]);
+
+      const fanartLogos = fanartRes.map(l => ({
+        url: l.url,
+        lang: l.lang || 'en',
+        fanartLikes: l.likes || 0,
+        source: 'fanart'
+      }));
+
+      const tmdbLogos = tmdbRes.map(l => ({
+        url: `https://image.tmdb.org/t/p/original${l.file_path}`,
+        lang: `${l.iso_639_1}-${l.iso_3166_1}` || 'en',
+        tmdbVotes: l.vote_average || 0,
+        source: 'tmdb'
+      }));
+
+      const combined = [...fanartLogos, ...tmdbLogos];
+
+      if (combined.length === 0) return '';
+
+      const picked = pickLogo(combined, language, originalLanguage);
+      return picked?.url || '';
+    } catch (error) {
+      if (error.message !== "TMDB_API_KEY_MISSING" && error.message !== "TMDB_API_KEY_INVALID") {
+        console.error(`Error fetching logo for series ${tmdbId}:`, error.message);
+      }
+      return '';
     }
-
-    const moviedb = getTmdbClient(config);
-    const [fanartRes, tmdbRes] = await Promise.all([
-      (fanart && tvdb_id)
-        ? fanart
-          .getShowImages(tvdb_id)
-          .then(res => res.hdtvlogo || [])
-          .catch(() => [])
-        : Promise.resolve([]),
-
-      tmdbId
-        ? moviedb
-          .tvImages({ id: tmdbId })
-          .then(res => res.logos || [])
-          .catch(() => [])
-        : Promise.resolve([])
-    ]);
-
-    const fanartLogos = fanartRes.map(l => ({
-      url: l.url,
-      lang: l.lang || 'en',
-      fanartLikes: l.likes || 0,
-      source: 'fanart'
-    }));
-
-    const tmdbLogos = tmdbRes.map(l => ({
-      url: `https://image.tmdb.org/t/p/original${l.file_path}`,
-      lang: `${l.iso_639_1}-${l.iso_3166_1}` || 'en',
-      tmdbVotes: l.vote_average || 0,
-      source: 'tmdb'
-    }));
-
-    const combined = [...fanartLogos, ...tmdbLogos];
-
-    if (combined.length === 0) return '';
-
-    const picked = pickLogo(combined, language, originalLanguage);
-    return picked?.url || '';
-  } catch (error) {
-    if (error.message !== "TMDB_API_KEY_MISSING" && error.message !== "TMDB_API_KEY_INVALID") {
-      console.error(`Error fetching logo for series ${tmdbId}:`, error.message);
-    }
-    return '';
-  }
+  }, LOGO_TTL);
 }
 
 module.exports = { getLogo, getTvLogo };

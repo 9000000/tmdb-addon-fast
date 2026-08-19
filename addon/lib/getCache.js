@@ -58,11 +58,22 @@ function getRedisClient() {
   if (NO_CACHE) return null;
   if (redisInstance) return redisInstance;
 
+  const defaultRedisOptions = {
+    maxRetriesPerRequest: 2,
+    retryDelayOnFailover: 100,
+    lazyConnect: false,
+    enableOfflineQueue: false, // Fail fast if Redis is down, don't buffer endless commands
+    enableReadyCheck: true,
+    connectTimeout: 8000,
+    commandTimeout: 2000, // 2s max per Redis command
+    keepAlive: 30000, // 30s TCP keepalive
+  };
+
   if (REDIS_IS_CLUSTER && REDIS_CLUSTER_NODES.length > 0) {
     console.log('[Cache] Initializing Redis CLUSTER client...');
     redisInstance = new Redis.Cluster(REDIS_CLUSTER_NODES, {
       redisOptions: {
-        maxRetriesPerRequest: 3,
+        ...defaultRedisOptions,
         tls: process.env.REDIS_USE_TLS === 'true' ? { rejectUnauthorized: false } : undefined,
       },
       clusterRetryStrategy: (times) => Math.min(times * 100, 2000)
@@ -73,12 +84,8 @@ function getRedisClient() {
     const usesTLS = REDIS_URL.startsWith('rediss://');
 
     const redisOptions = {
-      maxRetriesPerRequest: 3,
-      retryDelayOnFailover: 100,
-      lazyConnect: false,
+      ...defaultRedisOptions,
       tls: (isUpstash || usesTLS) ? { rejectUnauthorized: false } : undefined,
-      enableReadyCheck: false,
-      connectTimeout: 10000,
     };
     redisInstance = new Redis(REDIS_URL, redisOptions);
   }

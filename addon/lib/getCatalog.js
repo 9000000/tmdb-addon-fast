@@ -10,8 +10,8 @@ const { rateLimitedMapFiltered } = require("../utils/rateLimiter");
 const CATALOG_TYPES = require("../static/catalog-types.json");
 const { cacheWrapCatalog } = require("./getCache");
 
-async function getCatalog(type, language, page, id, genre, config) {
-  const cacheKey = `${type}:${language}:${page || 1}:${id}:${genre || ''}:${config.strictRegionFilter || 'false'}:${config.digitalReleaseFilter || 'false'}`;
+async function getCatalog(type, language, page, id, genre, config = {}) {
+  const cacheKey = `${type}:${language}:${page || 1}:${id}:${genre || ''}:${config.strictRegionFilter || 'false'}:${config.digitalReleaseFilter || 'false'}:${config.ageRating || ''}:${config.rpdbkey || ''}:${config.topposterskey || ''}:${config.includeAdult || 'false'}`;
 
   return cacheWrapCatalog(cacheKey, async () => {
     const moviedb = getTmdbClient(config);

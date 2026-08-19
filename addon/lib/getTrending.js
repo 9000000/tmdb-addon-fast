@@ -5,8 +5,8 @@ const { rateLimitedMapFiltered } = require("../utils/rateLimiter");
 const { cacheWrapCatalog } = require("./getCache");
 const { parseCatalogItem } = require("../utils/parseProps");
 
-async function getTrending(type, language, page, genre, config) {
-  const cacheKey = `trending:${type}:${language}:${page || 1}:${genre || 'day'}:${config.strictRegionFilter || 'false'}:${config.digitalReleaseFilter || 'false'}`;
+async function getTrending(type, language, page, genre, config = {}) {
+  const cacheKey = `trending:${type}:${language}:${page || 1}:${genre || 'day'}:${config.strictRegionFilter || 'false'}:${config.digitalReleaseFilter || 'false'}:${config.rpdbkey || ''}:${config.topposterskey || ''}`;
 
   return cacheWrapCatalog(cacheKey, async () => {
     const moviedb = getTmdbClient(config);
